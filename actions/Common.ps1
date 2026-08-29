@@ -167,3 +167,47 @@ function Exit-ActionLock {
     try { $Mutex.ReleaseMutex() } catch { }
     $Mutex.Dispose()
 }
+
+function Get-ActionLogPath {
+    param(
+        [Parameter(Mandatory)][PSCustomObject]$Ctx,
+        [Parameter(Mandatory)][string]$ActionName
+    )
+
+    $logDir = $Ctx.ConfigPath
+    if (-not (Test-Path $logDir)) {
+        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+    }
+
+    return Join-Path $logDir "$ActionName.log"
+}
+
+function Write-ActionLog {
+    param(
+        [Parameter(Mandatory)][string]$LogPath,
+        [Parameter(Mandatory)][string]$Message
+    )
+
+    Write-Host $Message
+
+    if (-not (Test-Path $LogPath)) {
+        $parent = Split-Path $LogPath -Parent
+        if (-not (Test-Path $parent)) {
+            New-Item -Path $parent -ItemType Directory -Force | Out-Null
+        }
+    }
+
+    $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    Add-Content -Path $LogPath -Value "[$timestamp] $Message" -Encoding UTF8
+}
+
+function Write-ActionMessage {
+    param(
+        [Parameter(Mandatory)][PSCustomObject]$Ctx,
+        [Parameter(Mandatory)][string]$ActionName,
+        [Parameter(Mandatory)][string]$Message
+    )
+
+    $logPath = Get-ActionLogPath -Ctx $Ctx -ActionName $ActionName
+    Write-ActionLog -LogPath $logPath -Message $Message
+}

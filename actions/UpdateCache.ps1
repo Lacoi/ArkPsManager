@@ -1,14 +1,27 @@
 # UpdateCache.ps1
 # Standalone action script - takes no parameters.
 
-Write-Host "=== UpdateCache ==="
-Write-Host "Running cache update at $(Get-Date -Format 'dd.MM.yyyy HH:mm:ss')..."
+. (Join-Path $PSScriptRoot "Common.ps1")
+
+$cacheRoot = Join-Path (Split-Path $PSScriptRoot -Parent) "cache"
+if (-not (Test-Path $cacheRoot)) {
+    New-Item -Path $cacheRoot -ItemType Directory -Force | Out-Null
+}
+$logPath = Join-Path $cacheRoot "update.log"
+
+$installDir = Join-Path $cacheRoot "\Server"
+if (-not (Test-Path $installDir)) {
+    New-Item -Path $installDir -ItemType Directory -Force | Out-Null
+}
+
+Write-ActionLog -LogPath $logPath -Message "=== UpdateCache ==="
+Write-ActionLog -LogPath $logPath -Message "Running cache update at $(Get-Date -Format 'dd.MM.yyyy HH:mm:ss')..."
 
 $steamCmdDir = Join-Path $PSScriptRoot "..\cache\SteamCMD"
 $steamCmdExe = Join-Path $steamCmdDir "steamcmd.exe"
 
 if ((-not (Test-Path $steamCmdExe)) -or (-not (Test-Path $steamCmdExe -PathType Leaf))) {
-    Write-Host "SteamCMD not found. Installing to $steamCmdDir..."
+    Write-ActionLog -LogPath $logPath -Message "SteamCMD not found. Installing to $steamCmdDir..."
 
     New-Item -Path $steamCmdDir -ItemType Directory -Force | Out-Null
     $zipPath = Join-Path $steamCmdDir "steamcmd.zip"
@@ -20,19 +33,17 @@ if ((-not (Test-Path $steamCmdExe)) -or (-not (Test-Path $steamCmdExe -PathType 
 
         # First run lets steamcmd self-update/bootstrap before it's used elsewhere
         & $steamCmdExe +quit
-        Write-Host "SteamCMD installed successfully."
+        Write-ActionLog -LogPath $logPath -Message "SteamCMD installed successfully."
     } catch {
-        Write-Warning "Failed to install SteamCMD: $_"
+        Write-ActionLog -LogPath $logPath -Message "Failed to install SteamCMD: $_"
     }
 } else {
-    Write-Host "SteamCMD already installed at $steamCmdDir."
+    Write-ActionLog -LogPath $logPath -Message "SteamCMD already installed at $steamCmdDir."
 }
 
-$installDir = Join-Path $PSScriptRoot "..\Cache\Server"
+Write-ActionLog -LogPath $logPath -Message "Installing/updating app 2430930 to $installDir..."
+& $steamCmdExe +force_install_dir $installDir +login anonymous +app_update 2430930 validate +quit | Tee-Object -FilePath $logPath -Append -Encoding utf8
 
-Write-Host "Installing/updating app 2430930 to $installDir..."
-& $steamCmdExe +force_install_dir $installDir +login anonymous +app_update 2430930 validate +quit
-
-Write-Host "Cache update completed."
+Write-ActionLog -LogPath $logPath -Message "Cache update completed."
 Start-Sleep -Seconds 10
 Exit 0

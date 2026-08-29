@@ -1,6 +1,17 @@
 # ServerBackup.psm1
 # Server Backup helpers, imported via: Import-Module (Join-Path $PSScriptRoot "ServerBackup") -Force
 
+function Invoke-BackupLog {
+    param(
+        [scriptblock]$LogAction,
+        [string]$Message
+    )
+
+    if ($null -ne $LogAction) {
+        & $LogAction $Message
+    }
+}
+
 function Backup-ArkServer {
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param(
@@ -14,12 +25,18 @@ function Backup-ArkServer {
         [string[]]$ArkExtensions = @('.arkprofile', '.arktribe'),  # Extensions to grab from SavedArks subfolder
 
         [Parameter(Mandatory = $false)]
-        [switch]$ShowProgress         # Display a Write-Progress bar while archiving
+        [switch]$ShowProgress,        # Display a Write-Progress bar while archiving
+
+        [Parameter(Mandatory = $false)]
+        [scriptblock]$LogAction
     )
 
     if (-not (Test-Path $SourcePath)) {
         throw "Source path '$SourcePath' does not exist."
     }
+
+    Invoke-BackupLog -LogAction $LogAction -Message "Starting backup from '$SourcePath' to '$DestinationPath'."
+
     if (-not (Test-Path $DestinationPath)) {
         if ($PSCmdlet.ShouldProcess($DestinationPath, "Create destination directory")) {
             New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
@@ -49,7 +66,9 @@ function Backup-ArkServer {
         }
     }
     else {
-        Write-Warning "WindowsServer config path not found: $configSrc"
+        $message = "WindowsServer config path not found: $configSrc"
+        Write-Warning $message
+        Invoke-BackupLog -LogAction $LogAction -Message $message
     }
 
     $savedArksSrc = Join-Path $SourcePath "ShooterGame\Saved\SavedArks"
@@ -81,15 +100,21 @@ function Backup-ArkServer {
                 })
             }
             else {
-                Write-Warning "Expected .ark file not found: $arkFile"
+                $message = "Expected .ark file not found: $arkFile"
+                Write-Warning $message
+                Invoke-BackupLog -LogAction $LogAction -Message $message
             }
         }
         else {
-            Write-Warning "No subfolder found under SavedArks: $savedArksSrc"
+            $message = "No subfolder found under SavedArks: $savedArksSrc"
+            Write-Warning $message
+            Invoke-BackupLog -LogAction $LogAction -Message $message
         }
     }
     else {
-        Write-Warning "SavedArks path not found: $savedArksSrc"
+        $message = "SavedArks path not found: $savedArksSrc"
+        Write-Warning $message
+        Invoke-BackupLog -LogAction $LogAction -Message $message
     }
 
     $saveGamesSrc = Join-Path $SourcePath "ShooterGame\Saved\SaveGames"
@@ -103,11 +128,15 @@ function Backup-ArkServer {
         }
     }
     else {
-        Write-Warning "SaveGames path not found: $saveGamesSrc"
+        $message = "SaveGames path not found: $saveGamesSrc"
+        Write-Warning $message
+        Invoke-BackupLog -LogAction $LogAction -Message $message
     }
 
     if ($filePlan.Count -eq 0) {
-        Write-Warning "No files found to back up. Aborting."
+        $message = "No files found to back up. Aborting."
+        Write-Warning $message
+        Invoke-BackupLog -LogAction $LogAction -Message $message
         return
     }
 
@@ -118,6 +147,7 @@ function Backup-ArkServer {
 
     $zipName = "${mapName}_${timestamp}.zip"
     $zipPath = Join-Path $DestinationPath $zipName
+    Invoke-BackupLog -LogAction $LogAction -Message "Creating backup archive '$zipPath' with $($filePlan.Count) file(s)."
 
     # ---------------------------------------------------------
     # -WhatIf: report what would happen, then stop
@@ -125,6 +155,7 @@ function Backup-ArkServer {
     if (-not $PSCmdlet.ShouldProcess($zipPath, "Create zip archive with $($filePlan.Count) file(s)")) {
         foreach ($item in $filePlan) {
             Write-Host "What if: Add '$($item.SourceFile)' as '$($item.EntryName)'"
+            Invoke-BackupLog -LogAction $LogAction -Message "What if: Add '$($item.SourceFile)' as '$($item.EntryName)'"
         }
         return
     }
@@ -163,6 +194,8 @@ function Backup-ArkServer {
         }
     }
 
-    Write-Host "Backup created: $zipPath ($total files)" -ForegroundColor Green
+    $message = "Backup created: $zipPath ($total files)"
+    Write-Host $message -ForegroundColor Green
+    Invoke-BackupLog -LogAction $LogAction -Message $message
     return $zipPath
 }

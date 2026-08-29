@@ -372,7 +372,7 @@ function Invoke-EntryAction {
     )
 
     try {
-        Start-Process -FilePath "powershell.exe" -ArgumentList $argList -WindowStyle Normal
+        Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Normal
     } catch {
         [System.Windows.Forms.MessageBox]::Show("Error launching '$ScriptName.ps1' for '$Key':`n$_", "Script Error") | Out-Null
     }
@@ -460,7 +460,7 @@ function Invoke-UpdateCache {
     )
 
     try {
-        Start-Process -FilePath "powershell.exe" -ArgumentList $argList -WindowStyle Normal
+        Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Normal
     } catch {
         [System.Windows.Forms.MessageBox]::Show("Error launching 'UpdateCache.ps1':`n$_", "Script Error") | Out-Null
     }
@@ -639,12 +639,14 @@ $form.Controls.Add($grid)
 $colKey = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colKey.Name = "KeyCol"
 $colKey.HeaderText = "Key"
+$colKey.SortMode = "NotSortable"
 $colKey.Visible = $false
 [void]$grid.Columns.Add($colKey)
 
 $colPid = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colPid.Name = "Pid"
 $colPid.HeaderText = "PID"
+$colPid.SortMode = "NotSortable"
 $colPid.Width = 60
 $colPid.ReadOnly = $true
 [void]$grid.Columns.Add($colPid)
@@ -652,6 +654,7 @@ $colPid.ReadOnly = $true
 $colSession = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colSession.Name = "SessionName"
 $colSession.HeaderText = "Session Name"
+$colSession.SortMode = "NotSortable"
 $colSession.Width = 215
 $colSession.ReadOnly = $true
 [void]$grid.Columns.Add($colSession)
@@ -659,6 +662,7 @@ $colSession.ReadOnly = $true
 $colRam = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colRam.Name = "RamGB"
 $colRam.HeaderText = "RAM (GB)"
+$colRam.SortMode = "NotSortable"
 $colRam.Width = 80
 $colRam.ReadOnly = $true
 [void]$grid.Columns.Add($colRam)
@@ -666,6 +670,7 @@ $colRam.ReadOnly = $true
 $colStart = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colStart.Name = "StartTime"
 $colStart.HeaderText = "Start Time"
+$colStart.SortMode = "NotSortable"
 $colStart.Width = 130
 $colStart.ReadOnly = $true
 [void]$grid.Columns.Add($colStart)

@@ -1,6 +1,17 @@
 # ServerSync.psm1
 # Folder-sync helpers, imported via: Import-Module (Join-Path $PSScriptRoot "ServerSync") -Force
 
+function Invoke-SyncLog {
+    param(
+        [scriptblock]$LogAction,
+        [string]$Message
+    )
+
+    if ($null -ne $LogAction) {
+        & $LogAction $Message
+    }
+}
+
 function Sync-Folder {
     <#
     .SYNOPSIS
@@ -68,7 +79,9 @@ function Sync-Folder {
         [switch]$Mirror,
 
         [ValidateSet('DateSize', 'Hash')]
-        [string]$CompareMethod = 'DateSize'
+        [string]$CompareMethod = 'DateSize',
+
+        [scriptblock]$LogAction
     )
 
     # --- Resolve paths -----------------------------------------------------
@@ -117,6 +130,8 @@ function Sync-Folder {
         Deleted   = 0
         Errors    = 0
     }
+
+    Invoke-SyncLog -LogAction $LogAction -Message "Syncing '$Source' -> '$Target'"
 
     # --- Recreate the source's folder structure on the target --------------
     $sourceDirs = Get-ChildItem -LiteralPath $Source -Recurse -Directory -Force -ErrorAction SilentlyContinue
@@ -178,7 +193,9 @@ function Sync-Folder {
                     if ($reason -eq 'new') { $result.Copied++ } else { $result.Updated++ }
                 }
                 catch {
-                    Write-Warning "Failed to copy '$relativePath': $($_.Exception.Message)"
+                    $message = "Failed to copy '$relativePath': $($_.Exception.Message)"
+                    Write-Warning $message
+                    Invoke-SyncLog -LogAction $LogAction -Message $message
                     $result.Errors++
                 }
             }
@@ -204,7 +221,9 @@ function Sync-Folder {
                     $result.Deleted++
                 }
                 catch {
-                    Write-Warning "Failed to delete '$relativePath': $($_.Exception.Message)"
+                    $message = "Failed to delete '$relativePath': $($_.Exception.Message)"
+                    Write-Warning $message
+                    Invoke-SyncLog -LogAction $LogAction -Message $message
                     $result.Errors++
                 }
             }
@@ -228,7 +247,7 @@ function Sync-Folder {
         #}
     }
 
-    [PSCustomObject]@{
+    $summary = [PSCustomObject]@{
         Source    = $Source
         Target    = $Target
         Copied    = $result.Copied
@@ -238,12 +257,17 @@ function Sync-Folder {
         Deleted   = $result.Deleted
         Errors    = $result.Errors
     }
+
+    Invoke-SyncLog -LogAction $LogAction -Message "Sync complete: $($summary.Copied) copied, $($summary.Updated) updated, $($summary.Unchanged) unchanged, $($summary.Errors) errors."
+
+    return $summary
 }
 
 Function Update-Server {
     param
     (
-        [Parameter(Mandatory=$true)][string]$TargetPath
+        [Parameter(Mandatory=$true)][string]$TargetPath,
+        [scriptblock]$LogAction
     )
 
     $toIgnore = @(
@@ -265,9 +289,14 @@ Function Update-Server {
         "ShooterGame\Binaries\Win64\msdia140.dll"
     )
 
-    if (Test-Path (Join-Path $PSScriptRoot "..\..\Cache\Server")) {
-        Sync-Folder -SourcePath (Join-Path $PSScriptRoot "..\..\Cache\Server") -TargetPath $TargetPath -ExcludeFilter $toIgnore -Mirror -CompareMethod "DateSize" -Verbose #-WhatIf
+    $cachePath = Join-Path $PSScriptRoot "..\..\Cache\Server"
+
+    if (Test-Path $cachePath) {
+        Invoke-SyncLog -LogAction $LogAction -Message "Updating server files from '$cachePath' to '$TargetPath'."
+        Sync-Folder -SourcePath $cachePath -TargetPath $TargetPath -ExcludeFilter $toIgnore -Mirror -CompareMethod "DateSize" -Verbose -LogAction $LogAction #-WhatIf
     } else {
-        Write-Warning "Cache folder not found. Please run the 'UpdateCache' action first."
+        $message = "Cache folder not found. Please run the 'UpdateCache' action first."
+        Write-Warning $message
+        Invoke-SyncLog -LogAction $LogAction -Message $message
     }
 }

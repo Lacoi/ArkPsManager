@@ -34,10 +34,16 @@ function Write-ArkRconDebug {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$Message,
-        [Parameter(Mandatory = $false)][switch]$DebugMode
+        [Parameter(Mandatory = $false)][switch]$DebugMode,
+        [Parameter(Mandatory = $false)][scriptblock]$LogAction
     )
     if ($DebugMode) {
-        Write-Host "[DEBUG] $Message" -ForegroundColor Cyan
+        $debugMessage = "[DEBUG] $Message"
+        if ($null -ne $LogAction) {
+            & $LogAction $debugMessage
+        } else {
+            Write-Host $debugMessage -ForegroundColor Cyan
+        }
     }
 }
 
@@ -69,7 +75,8 @@ function New-ArkRconSession {
         [Parameter(Mandatory = $true)][string]$ServerIP,
         [Parameter(Mandatory = $true)][int]$Port,
         [Parameter(Mandatory = $true)][string]$Password,
-        [switch]$DebugMode
+        [switch]$DebugMode,
+        [scriptblock]$LogAction
     )
 
     return [PSCustomObject]@{
@@ -78,6 +85,7 @@ function New-ArkRconSession {
         Port       = $Port
         Password   = $Password
         DebugMode  = [bool]$DebugMode
+        LogAction  = $LogAction
         TcpClient  = $null
         Stream     = $null
         RequestId  = 0
@@ -119,7 +127,7 @@ function Test-ArkRconSocketConnected {
         }
     }
     catch {
-        Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Socket check threw exception: $($_.Exception.Message)"
+        Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Socket check threw exception: $($_.Exception.Message)" -LogAction $Session.LogAction
         return $false
     }
 }
@@ -217,7 +225,7 @@ function Connect-ArkRconInternal {
         [Parameter(Mandatory = $true)][PSCustomObject]$Session
     )
 
-    Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Attempting TCP connection to $($Session.ServerIP):$($Session.Port) ..."
+    Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Attempting TCP connection to $($Session.ServerIP):$($Session.Port) ..." -LogAction $Session.LogAction
 
     $client = New-Object System.Net.Sockets.TcpClient
     $connectTask = $client.BeginConnect($Session.ServerIP, $Session.Port, $null, $null)
@@ -235,7 +243,7 @@ function Connect-ArkRconInternal {
     $Session.TcpClient = $client
     $Session.Stream    = $client.GetStream()
 
-    Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "TCP connection established. Sending SERVERDATA_AUTH..."
+    Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "TCP connection established. Sending SERVERDATA_AUTH..." -LogAction $Session.LogAction
 
     $authId = Get-ArkRconNextRequestId -Session $Session
     Send-ArkRconPacket -Session $Session -Type $Script:SERVERDATA_AUTH -Body $Session.Password -Id $authId
@@ -245,7 +253,7 @@ function Connect-ArkRconInternal {
         $resp = Receive-ArkRconPacket -Session $Session
         if ($null -eq $resp) { break }
 
-        Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Received packet Type=$($resp.Type) Id=$($resp.Id) Body='$($resp.Body)'"
+        Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Received packet Type=$($resp.Type) Id=$($resp.Id) Body='$($resp.Body)'" -LogAction $Session.LogAction
 
         if ($resp.Type -eq $Script:SERVERDATA_AUTH_RESPONSE) {
             $authSucceeded = ($resp.Id -ne -1)
@@ -259,7 +267,7 @@ function Connect-ArkRconInternal {
     }
 
     $Session.Connected = $true
-    Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Authentication succeeded. Session ready for multiple commands."
+    Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Authentication succeeded. Session ready for multiple commands." -LogAction $Session.LogAction
 }
 
 function Close-ArkRconSocketOnly {
@@ -273,7 +281,7 @@ function Close-ArkRconSocketOnly {
         if ($Session.TcpClient) { $Session.TcpClient.Close() }
     }
     catch {
-        Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Error while closing connection: $($_.Exception.Message)"
+        Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Error while closing connection: $($_.Exception.Message)" -LogAction $Session.LogAction
     }
     finally {
         $Session.Stream    = $null
@@ -299,7 +307,7 @@ function Close-ArkRconSession {
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)][PSCustomObject]$Session
     )
     process {
-        Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Closing RCON session."
+        Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Closing RCON session." -LogAction $Session.LogAction
         Close-ArkRconSocketOnly -Session $Session
     }
 }
@@ -333,10 +341,10 @@ function Invoke-ArkRconCommand {
 
         if (-not (Test-ArkRconSocketConnected -Session $Session)) {
             if (-not $Session.Connected) {
-                Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "No active connection. Establishing connection."
+                Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "No active connection. Establishing connection." -LogAction $Session.LogAction
             }
             else {
-                Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Socket not connected. Retry attempt $attempt of $Script:MaxRetries."
+                Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Socket not connected. Retry attempt $attempt of $Script:MaxRetries." -LogAction $Session.LogAction
             }
 
             try {
@@ -356,7 +364,7 @@ function Invoke-ArkRconCommand {
         }
 
         try {
-            Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Socket connected. Sending command: $Command"
+            Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Socket connected. Sending command: $Command" -LogAction $Session.LogAction
 
             $cmdId = Get-ArkRconNextRequestId -Session $Session
             Send-ArkRconPacket -Session $Session -Type $Script:SERVERDATA_EXECCOMMAND -Body $Command -Id $cmdId
@@ -370,7 +378,7 @@ function Invoke-ArkRconCommand {
                     throw "Connection closed by remote host while waiting for response."
                 }
 
-                Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Received packet Id=$($packet.Id) Type=$($packet.Type) Body='$($packet.Body)'"
+                Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Received packet Id=$($packet.Id) Type=$($packet.Type) Body='$($packet.Body)'" -LogAction $Session.LogAction
 
                 if ($packet.Id -eq $cmdId) {
                     $response = $packet
@@ -379,7 +387,7 @@ function Invoke-ArkRconCommand {
                 else {
                     # Stray/keep-alive packet (often Id=0, empty body or "Keep Alive").
                     # Discard and keep waiting for the packet matching our request Id.
-                    Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Ignoring unmatched packet (expected Id=$cmdId)."
+                    Write-ArkRconDebug -DebugMode:$Session.DebugMode -Message "Ignoring unmatched packet (expected Id=$cmdId)." -LogAction $Session.LogAction
                 }
             }
 

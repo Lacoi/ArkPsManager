@@ -6,18 +6,18 @@ param(
 . (Join-Path $PSScriptRoot "Common.ps1")
 Import-Module (Join-Path $PSScriptRoot "ArkRcon") -Force
 
+$ctx = Get-ActionContext -ConfigJsonPath $ConfigJsonPath -Key $Key
+Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "=== Stop: $Key ==="
+
 $actionLock = Enter-ActionLock -Key $Key
 if (-not $actionLock) {
-    Write-Warning "Another action is already running for '$Key'. Skipping."
+    Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Another action is already running for '$Key'. Skipping."
     Exit 1
 }
 
 try {
-    Write-Host "=== Stop: $Key ==="
-    $ctx = Get-ActionContext -ConfigJsonPath $ConfigJsonPath -Key $Key
-
     if (-not $ctx.Pid) {
-        Write-Warning "No running process found for '$($ctx.Key)'. Nothing to stop."
+        Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "No running process found for '$($ctx.Key)'. Nothing to stop."
         Exit 1
         return
     }
@@ -27,7 +27,10 @@ try {
 
         $DebugPreference = 'Continue' 
 
-        $session = New-ArkRconSession -ServerIP 127.0.0.1 -Port $ini.RCONPort -Password $ini.ServerAdminPassword -DebugMode
+        $session = New-ArkRconSession -ServerIP 127.0.0.1 -Port $ini.RCONPort -Password $ini.ServerAdminPassword -DebugMode -LogAction {
+            param([string]$Message)
+            Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message $Message
+        }
 
         $shutdownTime = [int]$ctx.GlobalSettings.Shutdown.Time
         $messages = $ctx.GlobalSettings.Shutdown.Messages
@@ -35,15 +38,15 @@ try {
         for ($secondsLeft = $shutdownTime; $secondsLeft -ge 0; $secondsLeft--) {
             $match = $messages.PSObject.Properties | Where-Object { $_.Name -eq "$secondsLeft" } | Select-Object -First 1
             if ($match) {
-                Write-Host "[$secondsLeft s] Broadcasting: $($match.Value)"
+                Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "[$secondsLeft s] Broadcasting: $($match.Value)"
                 Invoke-ArkRconCommand -Session $session -Command "broadcast $($match.Value)"
             }
 
             if ($secondsLeft % 15 -eq 0) {
                 $playerList = Invoke-ArkRconCommand -Session $session -Command "listplayers"
-                Write-Host "[$secondsLeft s] Players connected: $playerList"
+                Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "[$secondsLeft s] Players connected: $playerList"
                 if ($playerList -match "No Players Connected") {
-                    Write-Host "No players connected, ending shutdown wait early."
+                    Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "No players connected, ending shutdown wait early."
                     break
                 }
             }
@@ -51,13 +54,13 @@ try {
             Start-Sleep -Seconds 1
         }
 
-        Write-Host "Sending saveworld command to server..."
+        Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Sending saveworld command to server..."
         Invoke-ArkRconCommand -Session $session -Command "saveworld"
 
         # Wait a few seconds to ensure the save completes before shutting down
         Start-Sleep -Seconds 20
 
-        Write-Host "Sending DoExit command to server..."
+        Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Sending DoExit command to server..."
         Invoke-ArkRconCommand -Session $session -Command "DoExit"
 
         Close-ArkRconSession -Session $session
@@ -66,7 +69,7 @@ try {
         $attempt = 0
         $processExited = $false
         while ($attempt -lt $maxAttempts) {
-            Write-Host "Waiting for server '$($ctx.Key)' to stop... (attempt $($attempt + 1)/$maxAttempts)"
+            Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Waiting for server '$($ctx.Key)' to stop... (attempt $($attempt + 1)/$maxAttempts)"
             if (-not (Get-Process -Id $ctx.Pid -ErrorAction SilentlyContinue)) {
                 $processExited = $true
                 break
@@ -76,28 +79,28 @@ try {
         }
 
         if (-not $processExited) {
-            Write-Warning "Process PID $($ctx.Pid) did not exit in time, forcing kill..."
+            Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Process PID $($ctx.Pid) did not exit in time, forcing kill..."
             throw "Process PID $($ctx.Pid) did not exit in time, forcing kill..."
         } else {
-            Write-Host "Server '$($ctx.Key)' stopped successfully."
+            Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Server '$($ctx.Key)' stopped successfully."
         }
     } catch {
-        Write-Warning "Failed to stop process for '$($ctx.Key)': $_"
+        Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Failed to stop process for '$($ctx.Key)': $_"
         Close-ArkRconSession -Session $session
 
         ## Fallback to killing the process if RCON fails
         $proc = Get-Process -Id $ctx.Pid -ErrorAction Stop
-        Write-Host "Stopping server '$($ctx.Key)' (PID $($ctx.Pid)) gracefully..."
+        Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Stopping server '$($ctx.Key)' (PID $($ctx.Pid)) gracefully..."
 
         if (-not $proc.CloseMainWindow()) {
-            Write-Warning "CloseMainWindow() failed or has no main window; falling back to Stop-Process."
+            Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "CloseMainWindow() failed or has no main window; falling back to Stop-Process."
             Stop-Process -Id $ctx.Pid -ErrorAction Stop
         } else {
             $exited = $proc.WaitForExit(10000)
             if (-not $exited) {
-                Write-Warning "Process did not exit within timeout after CloseMainWindow()."
+                Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Process did not exit within timeout after CloseMainWindow()."
             } else {
-                Write-Host "Server '$($ctx.Key)' stopped."
+                Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "Server '$($ctx.Key)' stopped."
             }
         }
     }
