@@ -1,0 +1,39 @@
+﻿{
+    "GlobalSettings":  {
+                           "Process":  {
+                                           "Name":  "ArkAscendedServer",
+                                           "Path":  "ShooterGame\\Binaries\\Win64",
+                                           "restartTime":  120,
+                                           "restartEnabled":  true
+                                       },
+                           "Ini":  {
+                                       "Path":  "ShooterGame\\Saved\\Config\\WindowsServer",
+                                       "File":  "GameUserSettings.ini"
+                                   },
+                           "Startup":  {
+                                           "Path":  "ShooterGame\\Saved\\Config\\WindowsServer",
+                                           "File":  "RunServer.cmd",
+                                           "Delay":  5
+                                       },
+                           "Backup":  {
+                                          "Path":  "C:\\Backup\\ArkAsa"
+                                      },
+                           "Shutdown":  {
+                                            "Time":  900,
+                                            "ExitDelay":  5,
+                                            "Messages":  {
+                                                             "900":  "Server shutdown required. Server will shutdown in 15 minutes. Please logout before shutdown to prevent character corruption.",
+                                                             "600":  "Server shutdown required. Server will shutdown in 10 minutes. Please logout before shutdown to prevent character corruption.",
+                                                             "300":  "Server shutdown required. Server will shutdown in 5 minutes. Please logout before shutdown to prevent character corruption.",
+                                                             "60":  "Server shutdown required. Server will shutdown in 1 minute. Please logout before shutdown to prevent character corruption.",
+                                                             "0":  "Server shutdown required. Server is shutting down now."
+                                                         }
+                                        }
+                       },
+    "Entries":  [
+                    {
+                        "Key":  "Testserver",
+                        "ServerPath":  "C:\\ArkServer\\Server0"
+                    }
+                ]
+}

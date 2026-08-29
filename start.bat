@@ -1,0 +1,1 @@
+PowerShell.exe -WindowStyle hidden -File App.ps1
