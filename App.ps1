@@ -65,12 +65,6 @@ function Read-Config {
             if (-not $json.GlobalSettings.Process) {
                 $json.GlobalSettings | Add-Member -NotePropertyName Process -NotePropertyValue (Get-DefaultConfig).GlobalSettings.Process
             }
-            if (-not (Get-Member -InputObject $json.GlobalSettings.Process -Name 'RestartEnabled' -MemberType NoteProperty)) {
-                $json.GlobalSettings.Process | Add-Member -NotePropertyName RestartEnabled -NotePropertyValue $false
-            }
-            if (-not (Get-Member -InputObject $json.GlobalSettings.Process -Name 'RestartTime' -MemberType NoteProperty)) {
-                $json.GlobalSettings.Process | Add-Member -NotePropertyName RestartTime -NotePropertyValue 300
-            }
             if (-not $json.GlobalSettings.Ini) {
                 $json.GlobalSettings | Add-Member -NotePropertyName Ini -NotePropertyValue (Get-DefaultConfig).GlobalSettings.Ini
             }
@@ -93,6 +87,7 @@ function Read-Config {
                         SessionName      = $null   # runtime only, cached at startup / manual refresh
                         StoppedSince     = $null   # runtime only, used by the auto-restart check
                         RestartTriggered = $false  # runtime only, used by the auto-restart check
+                        RestartEnabled   = $false  # runtime only, used by the auto-restart check
                     })
                 }
             }
@@ -156,14 +151,7 @@ function Set-RestartEnabled {
         $onDisk = Get-Content $configPath -Raw | ConvertFrom-Json
         if (-not $onDisk.GlobalSettings) { $onDisk | Add-Member -NotePropertyName GlobalSettings -NotePropertyValue $script:config.GlobalSettings }
         if (-not $onDisk.GlobalSettings.Process) { $onDisk.GlobalSettings | Add-Member -NotePropertyName Process -NotePropertyValue $script:config.GlobalSettings.Process }
-        if (-not (Get-Member -InputObject $onDisk.GlobalSettings.Process -Name 'RestartEnabled' -MemberType NoteProperty)) {
-            $onDisk.GlobalSettings.Process | Add-Member -NotePropertyName RestartEnabled -NotePropertyValue $Enabled
-        } else {
-            $onDisk.GlobalSettings.Process.RestartEnabled = $Enabled
-        }
-        if (Get-Member -InputObject $onDisk.GlobalSettings.Process -Name 'restartEnabled' -MemberType NoteProperty) {
-            $onDisk.GlobalSettings.Process.PSObject.Properties.Remove('restartEnabled') | Out-Null
-        }
+        $onDisk.GlobalSettings.Process.RestartEnabled = $Enabled
         $onDisk | ConvertTo-Json -Depth 5 | Set-Content -Path $configPath -Encoding UTF8
     } catch {
         Write-Warning "Failed to persist RestartEnabled setting: $_"
@@ -811,9 +799,10 @@ function Update-Grid {
         if (-not $entry) { continue }
 
         $pidText = if ($entry.Pid) { $entry.Pid } else { "-" }
+        $pidText = if ($entry.RestartEnabled -eq $false) { $pidText + " NR" } else { $pidText + " R" }
         $sessionText = if ($entry.SessionName) { $entry.SessionName } else { "-" }
         $ramText = if ($null -ne $entry.RamGB) { "{0:N2}" -f $entry.RamGB } else { "-" }
-        $startText = if ($entry.StartTime) { $entry.StartTime.ToString("dd.MM.yyyy HH:mm:ss") } else { "-" }
+        $startText = if ($entry.StartTime) { $entry.StartTime.ToString("dd.MM.yyyy HH:mm:ss") } else { if ($entry.StoppedSince) { "off: " + $entry.StoppedSince.ToString("dd.MM.yyyy HH:mm:ss") } else { "-" } }
 
         if ($row.Cells["Pid"].Value -ne $pidText) { $row.Cells["Pid"].Value = $pidText }
         if ($row.Cells["SessionName"].Value -ne $sessionText) { $row.Cells["SessionName"].Value = $sessionText }
@@ -849,7 +838,7 @@ function Update-Grid {
     foreach ($entry in $script:config.Entries) {
         if ([string]::IsNullOrWhiteSpace($entry.ServerPath)) { continue }
 
-        if ($entry.Pid) {
+        if ($entry.Pid -or $null -eq $entry.SessionName -or -not $entry.RestartEnabled) {
             $entry.StoppedSince = $null
             $entry.RestartTriggered = $false
             continue
@@ -879,6 +868,14 @@ function Update-Grid {
     $lblStatus.Text = "Last refreshed: $(Get-Date -Format 'HH:mm:ss') (every 30s auto-refresh)"
 }
 
+function Update-AutorestartFlags {
+    foreach ($entry in $script:config.Entries) {
+        if ($null -ne $entry.Pid -and $null -ne $entry.SessionName) {
+            $entry.RestartEnabled = $true
+        }
+    }
+}
+
 function Clear-EntryFields {
     $txtKey.Clear()
     $txtServerPath.Clear()
@@ -887,6 +884,7 @@ function Clear-EntryFields {
 }
 
 Update-ProcessMatches
+Update-AutorestartFlags
 Update-SessionNames
 Reset-GridRows
 
@@ -999,6 +997,7 @@ $btnClear.Add_Click({ Clear-EntryFields })
 
 $btnRefreshProc.Add_Click({
     Update-ProcessMatches
+    Update-AutorestartFlags
     Update-SessionNames
     Update-Grid
 })
