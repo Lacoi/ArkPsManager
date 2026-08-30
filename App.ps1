@@ -798,8 +798,8 @@ function Update-Grid {
         $entry = $script:config.Entries | Where-Object { $_.Key -eq $key } | Select-Object -First 1
         if (-not $entry) { continue }
 
-        $pidText = if ($entry.Pid) { $entry.Pid } else { "-" }
-        $pidText = if ($entry.RestartEnabled -eq $false) { $pidText + " NR" } else { $pidText + " R" }
+        $pidRestartText = if ($entry.RestartEnabled -eq $false) { " NR" } else { " R" }
+        $pidText = if ($entry.Pid) { [string]$entry.Pid + $pidRestartText } else { "-" + $pidRestartText }
         $sessionText = if ($entry.SessionName) { $entry.SessionName } else { "-" }
         $ramText = if ($null -ne $entry.RamGB) { "{0:N2}" -f $entry.RamGB } else { "-" }
         $startText = if ($entry.StartTime) { $entry.StartTime.ToString("dd.MM.yyyy HH:mm:ss") } else { if ($entry.StoppedSince) { "off: " + $entry.StoppedSince.ToString("dd.MM.yyyy HH:mm:ss") } else { "-" } }
