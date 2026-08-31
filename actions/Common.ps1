@@ -70,19 +70,25 @@ function Get-ActionContext {
 
     if (-not [string]::IsNullOrWhiteSpace($procName) -and -not [string]::IsNullOrWhiteSpace($entryJson.ServerPath)) {
         try {
-            $filterName = if ($procName -notmatch '\.exe$') { "$procName.exe" } else { $procName }
-            $procs = Get-CimInstance Win32_Process -Filter "Name = '$filterName'" -ErrorAction Stop
+            $baseName = $procName -replace '\.exe$', ''
+            $procs = Get-Process -Name $baseName -ErrorAction SilentlyContinue
             $expectedPath = (Join-Path $entryJson.ServerPath $procSubPath).TrimEnd('\').ToLowerInvariant()
 
             foreach ($proc in $procs) {
-                if (-not $proc.ExecutablePath) { continue }
-                $procDir = (Split-Path $proc.ExecutablePath -Parent).TrimEnd('\').ToLowerInvariant()
+                $exePath = $null
+                try { $exePath = $proc.Path } catch { continue }
+                if (-not $exePath) { continue }
+                $procDir = (Split-Path $exePath -Parent).TrimEnd('\').ToLowerInvariant()
                 if ($procDir -eq $expectedPath) {
-                    $entryPid = $proc.ProcessId
-                    if ($proc.WorkingSetSize) { $ramGB = [math]::Round($proc.WorkingSetSize / 1GB, 2) }
-                    if ($proc.CreationDate) { $startTime = $proc.CreationDate }
+                    $entryPid = $proc.Id
+                    $ramGB = [math]::Round($proc.WorkingSet64 / 1GB, 2)
+                    try { $startTime = $proc.StartTime } catch { }
                     break
                 }
+            }
+            # Process objects hold native handles - dispose now that values have been copied out
+            foreach ($proc in $procs) { 
+                try { $proc.Dispose() } catch { } 
             }
         } catch {
             Write-Warning "Failed to query processes: $_"
@@ -113,15 +119,22 @@ function Test-ProcessRunning {
         return $false
     }
 
-    $procFileName = if ($Ctx.ProcessName -notmatch '\.exe$') { "$($Ctx.ProcessName).exe" } else { $Ctx.ProcessName }
-    $exePath = (Join-Path (Join-Path $Ctx.ServerPath $Ctx.ProcessPath) $procFileName).ToLowerInvariant()
+    $baseName = $Ctx.ProcessName -replace '\.exe$', ''
+    $exePath = (Join-Path (Join-Path $Ctx.ServerPath $Ctx.ProcessPath) $baseName).ToLowerInvariant()
 
     try {
-        $procs = Get-CimInstance Win32_Process -Filter "Name = '$procFileName'" -ErrorAction Stop
+        $procs = Get-Process -Name $baseName -ErrorAction SilentlyContinue
         foreach ($proc in $procs) {
-            if ($proc.ExecutablePath -and $proc.ExecutablePath.ToLowerInvariant() -eq $exePath) {
-                return $proc.ProcessId
+            $procPath = $null
+            try { $procPath = $proc.Path } catch { continue }
+            if ($procPath -and $procPath.ToLowerInvariant() -eq $exePath) {
+                $result = $proc.Id
+                try { $proc.Dispose() } catch { }
+                return $result
             }
+        }
+        foreach ($proc in $procs) { 
+            try { $proc.Dispose() } catch { } 
         }
     } catch {
         Write-Warning "Failed to query processes: $_"

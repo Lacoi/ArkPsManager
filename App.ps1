@@ -149,8 +149,10 @@ function Set-RestartEnabled {
     if (-not (Test-Path $configPath)) { return }
     try {
         $onDisk = Get-Content $configPath -Raw | ConvertFrom-Json
-        if (-not $onDisk.GlobalSettings) { $onDisk | Add-Member -NotePropertyName GlobalSettings -NotePropertyValue $script:config.GlobalSettings }
-        if (-not $onDisk.GlobalSettings.Process) { $onDisk.GlobalSettings | Add-Member -NotePropertyName Process -NotePropertyValue $script:config.GlobalSettings.Process }
+        # Ensure structure exists
+        if (-not $onDisk.GlobalSettings) { $onDisk | Add-Member -NotePropertyName GlobalSettings -NotePropertyValue @{} }
+        if (-not $onDisk.GlobalSettings.Process) { $onDisk.GlobalSettings | Add-Member -NotePropertyName Process -NotePropertyValue @{} }
+        # Update only the target property
         $onDisk.GlobalSettings.Process.RestartEnabled = $Enabled
         $onDisk | ConvertTo-Json -Depth 5 | Set-Content -Path $configPath -Encoding UTF8
     } catch {
@@ -181,7 +183,7 @@ if (Test-Path $settingsScriptPath) {
 }
 
 # ---------------------------
-# INI helper
+# INI helper (single-key wrapper for Common.ps1's multi-key version)
 # ---------------------------
 function Get-IniValue {
     param(
@@ -266,7 +268,9 @@ function Update-ProcessMatches {
     }
 
     # Process objects hold native handles - dispose now that values have been copied out
-    foreach ($proc in $procs) { $proc.Dispose() }
+    foreach ($proc in $procs) { 
+        try { $proc.Dispose() } catch { } 
+    }
 }
 
 # ---------------------------
@@ -793,9 +797,15 @@ function Reset-GridRows {
 
 function Update-Grid {
     # Lightweight refresh - updates runtime fields on existing rows in place, no row rebuild
+    # Build hashtable for O(1) lookups instead of O(n) Where-Object searches
+    $entriesByKey = @{}
+    foreach ($e in $script:config.Entries) { 
+        $entriesByKey[$e.Key] = $e 
+    }
+    
     foreach ($row in $grid.Rows) {
         $key = $row.Cells["KeyCol"].Value
-        $entry = $script:config.Entries | Where-Object { $_.Key -eq $key } | Select-Object -First 1
+        $entry = $entriesByKey[$key]
         if (-not $entry) { continue }
 
         $pidRestartText = if ($entry.RestartEnabled -eq $false) { " NR" } else { " R" }
@@ -812,7 +822,7 @@ function Update-Grid {
 
     if ($grid.SelectedRows.Count -eq 1) {
         $selectedKey = $grid.SelectedRows[0].Cells["KeyCol"].Value
-        $entry = $script:config.Entries | Where-Object { $_.Key -eq $selectedKey } | Select-Object -First 1
+        $entry = $entriesByKey[$selectedKey]
         if ($entry) {
             $txtKey.Text        = $entry.Key
             $txtServerPath.Text = $entry.ServerPath
