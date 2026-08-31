@@ -27,120 +27,153 @@ function Show-SettingsDialog {
     # ---- Dialog form ----
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = "Global Settings"
-    $dlg.Size = New-Object System.Drawing.Size(700, 650)
+    $dlg.Size = New-Object System.Drawing.Size(700, 880)
     $dlg.StartPosition = "CenterScreen"
     $dlg.FormBorderStyle = "FixedDialog"
     $dlg.MaximizeBox = $false
     $dlg.MinimizeBox = $false
 
+    # ---- Process settings ----
+    $grpProcess = New-Object System.Windows.Forms.GroupBox
+    $grpProcess.Text = "Process"
+    $grpProcess.Location = New-Object System.Drawing.Point(15, 15)
+    $grpProcess.Size = New-Object System.Drawing.Size(645, 135)
+    $dlg.Controls.Add($grpProcess)
+
     $lblProcName = New-Object System.Windows.Forms.Label
-    $lblProcName.Text = "Process.Name:"
-    $lblProcName.Location = New-Object System.Drawing.Point(15, 20)
+    $lblProcName.Text = "Name:"
+    $lblProcName.Location = New-Object System.Drawing.Point(15, 25)
     $lblProcName.Size = New-Object System.Drawing.Size(120, 20)
-    $dlg.Controls.Add($lblProcName)
+    $grpProcess.Controls.Add($lblProcName)
 
     $txtProcName = New-Object System.Windows.Forms.TextBox
-    $txtProcName.Location = New-Object System.Drawing.Point(150, 17)
-    $txtProcName.Size = New-Object System.Drawing.Size(500, 24)
+    $txtProcName.Location = New-Object System.Drawing.Point(150, 22)
+    $txtProcName.Size = New-Object System.Drawing.Size(480, 24)
     $txtProcName.Text = $gs.Process.Name
-    $dlg.Controls.Add($txtProcName)
+    $grpProcess.Controls.Add($txtProcName)
 
     $lblProcPath = New-Object System.Windows.Forms.Label
-    $lblProcPath.Text = "Process.Path:"
-    $lblProcPath.Location = New-Object System.Drawing.Point(15, 50)
+    $lblProcPath.Text = "Path:"
+    $lblProcPath.Location = New-Object System.Drawing.Point(15, 55)
     $lblProcPath.Size = New-Object System.Drawing.Size(120, 20)
-    $dlg.Controls.Add($lblProcPath)
+    $grpProcess.Controls.Add($lblProcPath)
 
     $txtProcPath = New-Object System.Windows.Forms.TextBox
-    $txtProcPath.Location = New-Object System.Drawing.Point(150, 47)
-    $txtProcPath.Size = New-Object System.Drawing.Size(500, 24)
+    $txtProcPath.Location = New-Object System.Drawing.Point(150, 52)
+    $txtProcPath.Size = New-Object System.Drawing.Size(480, 24)
     $txtProcPath.Text = $gs.Process.Path
-    $dlg.Controls.Add($txtProcPath)
+    $grpProcess.Controls.Add($txtProcPath)
 
     $lblProcRestartTime = New-Object System.Windows.Forms.Label
-    $lblProcRestartTime.Text = "Process.RestartTime (s):"
-    $lblProcRestartTime.Location = New-Object System.Drawing.Point(15, 80)
+    $lblProcRestartTime.Text = "RestartTime (s):"
+    $lblProcRestartTime.Location = New-Object System.Drawing.Point(15, 85)
     $lblProcRestartTime.Size = New-Object System.Drawing.Size(130, 20)
-    $dlg.Controls.Add($lblProcRestartTime)
+    $grpProcess.Controls.Add($lblProcRestartTime)
 
     $numProcRestartTime = New-Object System.Windows.Forms.NumericUpDown
-    $numProcRestartTime.Location = New-Object System.Drawing.Point(150, 77)
+    $numProcRestartTime.Location = New-Object System.Drawing.Point(150, 82)
     $numProcRestartTime.Size = New-Object System.Drawing.Size(120, 24)
     $numProcRestartTime.Minimum = 0
     $numProcRestartTime.Maximum = 86400
     $numProcRestartTime.Value = [Math]::Max(0, [Math]::Min(86400, [int]$gs.Process.RestartTime))
-    $dlg.Controls.Add($numProcRestartTime)
+    $grpProcess.Controls.Add($numProcRestartTime)
+
+    # ---- Ini settings ----
+    $grpIni = New-Object System.Windows.Forms.GroupBox
+    $grpIni.Text = "Ini"
+    $grpIni.Location = New-Object System.Drawing.Point(15, 160)
+    $grpIni.Size = New-Object System.Drawing.Size(645, 95)
+    $dlg.Controls.Add($grpIni)
 
     $lblIniPath = New-Object System.Windows.Forms.Label
-    $lblIniPath.Text = "Ini.Path:"
-    $lblIniPath.Location = New-Object System.Drawing.Point(15, 110)
+    $lblIniPath.Text = "Path:"
+    $lblIniPath.Location = New-Object System.Drawing.Point(15, 25)
     $lblIniPath.Size = New-Object System.Drawing.Size(120, 20)
-    $dlg.Controls.Add($lblIniPath)
+    $grpIni.Controls.Add($lblIniPath)
 
     $txtIniPath = New-Object System.Windows.Forms.TextBox
-    $txtIniPath.Location = New-Object System.Drawing.Point(150, 107)
-    $txtIniPath.Size = New-Object System.Drawing.Size(500, 24)
+    $txtIniPath.Location = New-Object System.Drawing.Point(150, 22)
+    $txtIniPath.Size = New-Object System.Drawing.Size(480, 24)
     $txtIniPath.Text = $gs.Ini.Path
-    $dlg.Controls.Add($txtIniPath)
+    $grpIni.Controls.Add($txtIniPath)
 
     $lblIniFile = New-Object System.Windows.Forms.Label
-    $lblIniFile.Text = "Ini.File:"
-    $lblIniFile.Location = New-Object System.Drawing.Point(15, 140)
+    $lblIniFile.Text = "File:"
+    $lblIniFile.Location = New-Object System.Drawing.Point(15, 55)
     $lblIniFile.Size = New-Object System.Drawing.Size(120, 20)
-    $dlg.Controls.Add($lblIniFile)
+    $grpIni.Controls.Add($lblIniFile)
 
     $txtIniFile = New-Object System.Windows.Forms.TextBox
-    $txtIniFile.Location = New-Object System.Drawing.Point(150, 137)
-    $txtIniFile.Size = New-Object System.Drawing.Size(500, 24)
+    $txtIniFile.Location = New-Object System.Drawing.Point(150, 52)
+    $txtIniFile.Size = New-Object System.Drawing.Size(480, 24)
     $txtIniFile.Text = $gs.Ini.File
-    $dlg.Controls.Add($txtIniFile)
+    $grpIni.Controls.Add($txtIniFile)
+
+    # ---- Startup settings ----
+    $grpStartup = New-Object System.Windows.Forms.GroupBox
+    $grpStartup.Text = "Startup"
+    $grpStartup.Location = New-Object System.Drawing.Point(15, 265)
+    $grpStartup.Size = New-Object System.Drawing.Size(645, 135)
+    $dlg.Controls.Add($grpStartup)
+
+    $lblStartupName = New-Object System.Windows.Forms.Label
+    $lblStartupName.Text = "Name:"
+    $lblStartupName.Location = New-Object System.Drawing.Point(15, 25)
+    $lblStartupName.Size = New-Object System.Drawing.Size(120, 20)
+    $grpStartup.Controls.Add($lblStartupName)
+
+    $txtStartupName = New-Object System.Windows.Forms.TextBox
+    $txtStartupName.Location = New-Object System.Drawing.Point(150, 22)
+    $txtStartupName.Size = New-Object System.Drawing.Size(480, 24)
+    $txtStartupName.Text = $gs.Startup.Name
+    $grpStartup.Controls.Add($txtStartupName)
 
     $lblStartupPath = New-Object System.Windows.Forms.Label
-    $lblStartupPath.Text = "Startup.Path:"
-    $lblStartupPath.Location = New-Object System.Drawing.Point(15, 140)
+    $lblStartupPath.Text = "Path:"
+    $lblStartupPath.Location = New-Object System.Drawing.Point(15, 55)
     $lblStartupPath.Size = New-Object System.Drawing.Size(120, 20)
-    $dlg.Controls.Add($lblStartupPath)
+    $grpStartup.Controls.Add($lblStartupPath)
 
     $txtStartupPath = New-Object System.Windows.Forms.TextBox
-    $txtStartupPath.Location = New-Object System.Drawing.Point(150, 137)
-    $txtStartupPath.Size = New-Object System.Drawing.Size(500, 24)
+    $txtStartupPath.Location = New-Object System.Drawing.Point(150, 52)
+    $txtStartupPath.Size = New-Object System.Drawing.Size(480, 24)
     $txtStartupPath.Text = $gs.Startup.Path
-    $dlg.Controls.Add($txtStartupPath)
+    $grpStartup.Controls.Add($txtStartupPath)
 
     $lblStartupFile = New-Object System.Windows.Forms.Label
-    $lblStartupFile.Text = "Startup.File:"
-    $lblStartupFile.Location = New-Object System.Drawing.Point(15, 170)
+    $lblStartupFile.Text = "File:"
+    $lblStartupFile.Location = New-Object System.Drawing.Point(15, 85)
     $lblStartupFile.Size = New-Object System.Drawing.Size(120, 20)
-    $dlg.Controls.Add($lblStartupFile)
+    $grpStartup.Controls.Add($lblStartupFile)
 
     $txtStartupFile = New-Object System.Windows.Forms.TextBox
-    $txtStartupFile.Location = New-Object System.Drawing.Point(150, 167)
+    $txtStartupFile.Location = New-Object System.Drawing.Point(150, 82)
     $txtStartupFile.Size = New-Object System.Drawing.Size(220, 24)
     $txtStartupFile.Text = $gs.Startup.File
-    $dlg.Controls.Add($txtStartupFile)
+    $grpStartup.Controls.Add($txtStartupFile)
 
     $lblStartupDelay = New-Object System.Windows.Forms.Label
-    $lblStartupDelay.Text = "Startup.Delay (s):"
-    $lblStartupDelay.Location = New-Object System.Drawing.Point(390, 170)
+    $lblStartupDelay.Text = "Delay (s):"
+    $lblStartupDelay.Location = New-Object System.Drawing.Point(390, 85)
     $lblStartupDelay.Size = New-Object System.Drawing.Size(120, 20)
-    $dlg.Controls.Add($lblStartupDelay)
+    $grpStartup.Controls.Add($lblStartupDelay)
 
     $numStartupDelay = New-Object System.Windows.Forms.NumericUpDown
-    $numStartupDelay.Location = New-Object System.Drawing.Point(520, 167)
-    $numStartupDelay.Size = New-Object System.Drawing.Size(130, 24)
+    $numStartupDelay.Location = New-Object System.Drawing.Point(520, 82)
+    $numStartupDelay.Size = New-Object System.Drawing.Size(110, 24)
     $numStartupDelay.Minimum = 0
     $numStartupDelay.Maximum = 3600
     $numStartupDelay.Value = [Math]::Max(0, [Math]::Min(3600, [int]$gs.Startup.Delay))
-    $dlg.Controls.Add($numStartupDelay)
+    $grpStartup.Controls.Add($numStartupDelay)
 
     $lblBackupPath = New-Object System.Windows.Forms.Label
     $lblBackupPath.Text = "Backup.Path:"
-    $lblBackupPath.Location = New-Object System.Drawing.Point(15, 200)
+    $lblBackupPath.Location = New-Object System.Drawing.Point(15, 410)
     $lblBackupPath.Size = New-Object System.Drawing.Size(120, 20)
     $dlg.Controls.Add($lblBackupPath)
 
     $txtBackupPath = New-Object System.Windows.Forms.TextBox
-    $txtBackupPath.Location = New-Object System.Drawing.Point(150, 197)
+    $txtBackupPath.Location = New-Object System.Drawing.Point(150, 407)
     $txtBackupPath.Size = New-Object System.Drawing.Size(500, 24)
     $txtBackupPath.Text = $gs.Backup.Path
     $dlg.Controls.Add($txtBackupPath)
@@ -148,7 +181,7 @@ function Show-SettingsDialog {
     # ---- Shutdown settings ----
     $grpShutdown = New-Object System.Windows.Forms.GroupBox
     $grpShutdown.Text = "Shutdown"
-    $grpShutdown.Location = New-Object System.Drawing.Point(15, 230)
+    $grpShutdown.Location = New-Object System.Drawing.Point(15, 450)
     $grpShutdown.Size = New-Object System.Drawing.Size(645, 330)
     $dlg.Controls.Add($grpShutdown)
 
@@ -273,13 +306,13 @@ function Show-SettingsDialog {
 
     $btnOk = New-Object System.Windows.Forms.Button
     $btnOk.Text = "Save"
-    $btnOk.Location = New-Object System.Drawing.Point(490, 575)
+    $btnOk.Location = New-Object System.Drawing.Point(490, 800)
     $btnOk.Size = New-Object System.Drawing.Size(80, 30)
     $dlg.Controls.Add($btnOk)
 
     $btnCancel = New-Object System.Windows.Forms.Button
     $btnCancel.Text = "Cancel"
-    $btnCancel.Location = New-Object System.Drawing.Point(580, 575)
+    $btnCancel.Location = New-Object System.Drawing.Point(580, 800)
     $btnCancel.Size = New-Object System.Drawing.Size(80, 30)
     $dlg.Controls.Add($btnCancel)
 
@@ -294,6 +327,7 @@ function Show-SettingsDialog {
         $latest.GlobalSettings.Process.RestartTime = [int]$numProcRestartTime.Value
         $latest.GlobalSettings.Ini.Path = $txtIniPath.Text.Trim()
         $latest.GlobalSettings.Ini.File = $txtIniFile.Text.Trim()
+        $latest.GlobalSettings.Startup.Name = $txtStartupName.Text.Trim()
         $latest.GlobalSettings.Startup.Path = $txtStartupPath.Text.Trim()
         $latest.GlobalSettings.Startup.File = $txtStartupFile.Text.Trim()
         $latest.GlobalSettings.Startup.Delay = [int]$numStartupDelay.Value
