@@ -11,6 +11,7 @@
                                        "File":  "GameUserSettings.ini"
                                    },
                            "Startup":  {
+                                           "Name": "ArkAscendedServer",
                                            "Path":  "ShooterGame\\Saved\\Config\\WindowsServer",
                                            "File":  "RunServer.cmd",
                                            "Delay":  5

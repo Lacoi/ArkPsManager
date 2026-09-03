@@ -1,6 +1,6 @@
 param(
     [string]$Key,
-    [string]$ConfigJsonPath
+    [string]$ConfigJsonPath=(Get-Item $PSScriptRoot ).Parent.FullName + "\config.json"
 )
 
 . (Join-Path $PSScriptRoot "Common.ps1")

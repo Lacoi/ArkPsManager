@@ -59,20 +59,21 @@ function Read-Config {
     if (Test-Path $configPath) {
         try {
             $json = Get-Content $configPath -Raw | ConvertFrom-Json
+            $defaults = Get-DefaultConfig
             if (-not $json.GlobalSettings) {
-                $json | Add-Member -NotePropertyName GlobalSettings -NotePropertyValue (Get-DefaultConfig).GlobalSettings
+                $json | Add-Member -NotePropertyName GlobalSettings -NotePropertyValue $defaults.GlobalSettings
             }
             if (-not $json.GlobalSettings.Process) {
-                $json.GlobalSettings | Add-Member -NotePropertyName Process -NotePropertyValue (Get-DefaultConfig).GlobalSettings.Process
+                $json.GlobalSettings | Add-Member -NotePropertyName Process -NotePropertyValue $defaults.GlobalSettings.Process
             }
             if (-not $json.GlobalSettings.Ini) {
-                $json.GlobalSettings | Add-Member -NotePropertyName Ini -NotePropertyValue (Get-DefaultConfig).GlobalSettings.Ini
+                $json.GlobalSettings | Add-Member -NotePropertyName Ini -NotePropertyValue $defaults.GlobalSettings.Ini
             }
             if (-not $json.GlobalSettings.Startup) {
-                $json.GlobalSettings | Add-Member -NotePropertyName Startup -NotePropertyValue (Get-DefaultConfig).GlobalSettings.Startup
+                $json.GlobalSettings | Add-Member -NotePropertyName Startup -NotePropertyValue $defaults.GlobalSettings.Startup
             }
             if (-not $json.GlobalSettings.Backup) {
-                $json.GlobalSettings | Add-Member -NotePropertyName Backup -NotePropertyValue (Get-DefaultConfig).GlobalSettings.Backup
+                $json.GlobalSettings | Add-Member -NotePropertyName Backup -NotePropertyValue $defaults.GlobalSettings.Backup
             }
             $entries = [System.Collections.ArrayList]::new()
             if ($json.Entries) {
@@ -80,7 +81,7 @@ function Read-Config {
                     [void]$entries.Add([PSCustomObject]@{
                         Key              = $e.Key
                         ServerPath       = $e.ServerPath
-                        ConfigPath       = Join-Path $PSScriptRoot (Join-Path "maps" $e.Key)
+                        ConfigPath       = Join-Path $PSScriptRoot (Join-Path "config/maps" $e.Key)
                         Pid              = $null   # runtime only, not persisted
                         RamGB            = $null   # runtime only, not persisted
                         StartTime        = $null   # runtime only, not persisted
@@ -459,6 +460,36 @@ function Invoke-UpdateCache {
 }
 
 # ---------------------------
+# CreateServerSettings action (standalone, no arguments passed at all)
+# ---------------------------
+function Invoke-CreateServerSettings {
+    $scriptPath = Join-Path $PSScriptRoot "CreateServerSettings.ps1"
+
+    $check = Test-ActionScript -ScriptPath $scriptPath
+    if (-not $check.IsValid) {
+        [System.Windows.Forms.MessageBox]::Show(
+            $check.Reason,
+            "Action Script Unavailable",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $argList = @(
+        #"-NoExit" # Uncomment for debugging the action script in a new PowerShell window
+        "-ExecutionPolicy", "Bypass"
+        "-File", "`"$scriptPath`""
+    )
+
+    try {
+        Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Normal
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error launching 'CreateServerSettings.ps1':`n$_", "Script Error") | Out-Null
+    }
+}
+
+# ---------------------------
 # Form
 # ---------------------------
 $form = New-Object System.Windows.Forms.Form
@@ -755,6 +786,15 @@ $chkRestartEnabled.Add_CheckedChanged({
     Set-RestartEnabled -Enabled $chkRestartEnabled.Checked
 })
 
+# ---- CreateServerSettings button (standalone action, no entry context) ----
+$btnCreateServerSettings = New-Object System.Windows.Forms.Button
+$btnCreateServerSettings.Text = "Create Server Settings"
+$btnCreateServerSettings.Location = New-Object System.Drawing.Point(680, 680)
+$btnCreateServerSettings.Size = New-Object System.Drawing.Size(190, 28)
+$form.Controls.Add($btnCreateServerSettings)
+
+$btnCreateServerSettings.Add_Click({ Invoke-CreateServerSettings })
+
 # ---- Status label showing last refresh time ----
 $lblStatus = New-Object System.Windows.Forms.Label
 $lblStatus.Text = ""
@@ -845,6 +885,8 @@ function Update-Grid {
     # Auto-restart any entry that has been stopped longer than GlobalSettings.Process.RestartTime
     $restartEnabled = [bool]$script:config.GlobalSettings.Process.RestartEnabled
     $restartTimeSeconds = [int]($script:config.GlobalSettings.Process.RestartTime)
+    $startupPath = $script:config.GlobalSettings.Startup.Path
+    $startupFile = $script:config.GlobalSettings.Startup.File
     foreach ($entry in $script:config.Entries) {
         if ([string]::IsNullOrWhiteSpace($entry.ServerPath)) { continue }
 
@@ -855,6 +897,9 @@ function Update-Grid {
         }
 
         if (-not $restartEnabled -or $restartTimeSeconds -le 0) { continue }
+
+        # Check if the expected startup script exists before attempting to auto-restart
+        if (-not (Test-Path (Join-Path (Join-Path $entry.ServerPath $startupPath) "$startupFile") -PathType Leaf)) { continue }
 
         if (-not $entry.StoppedSince) {
             $entry.StoppedSince = Get-Date
@@ -921,7 +966,7 @@ $form.Add_FormClosing({
 $txtKey.Add_TextChanged({
     $keyVal = $txtKey.Text.Trim()
     if (-not [string]::IsNullOrWhiteSpace($keyVal)) {
-        $txtConfigPath.Text = Join-Path $PSScriptRoot (Join-Path "maps" $keyVal)
+        $txtConfigPath.Text = Join-Path $PSScriptRoot (Join-Path "config/maps" $keyVal)
     } else {
         $txtConfigPath.Clear()
     }
@@ -940,7 +985,7 @@ $btnAdd.Add_Click({
     [void]$script:config.Entries.Add([PSCustomObject]@{
         Key              = $key
         ServerPath       = $txtServerPath.Text.Trim()
-        ConfigPath       = Join-Path $PSScriptRoot (Join-Path "maps" $key)
+        ConfigPath       = Join-Path $PSScriptRoot (Join-Path "config/maps" $key)
         Pid              = $null
         RamGB            = $null
         StartTime        = $null
@@ -973,7 +1018,7 @@ $btnUpdate.Add_Click({
     }
     $script:config.Entries[$idx].Key        = $key
     $script:config.Entries[$idx].ServerPath = $txtServerPath.Text.Trim()
-    $script:config.Entries[$idx].ConfigPath = Join-Path $PSScriptRoot (Join-Path "maps" $key)
+    $script:config.Entries[$idx].ConfigPath = Join-Path $PSScriptRoot (Join-Path "config/maps" $key)
     Update-ProcessMatches
     Reset-GridRows
     Clear-EntryFields

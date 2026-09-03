@@ -1,0 +1,11 @@
+{
+    "map": "TheIsland_WP",
+    "startOptions": [
+        "/normal",
+        "/affinity 0000"
+    ],
+    "urlOptions": [
+        "Port=1111"
+    ],
+    "commandLineOptions": []
+}

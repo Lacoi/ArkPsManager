@@ -59,7 +59,7 @@ function Get-ActionContext {
     }
 
     $scriptRootForConfig = Split-Path $ConfigJsonPath -Parent
-    $configPath = Join-Path $scriptRootForConfig (Join-Path "maps" $entryJson.Key)
+    $configPath = Join-Path $scriptRootForConfig (Join-Path "config/maps" $entryJson.Key)
 
     $procName = $json.GlobalSettings.Process.Name
     $procSubPath = $json.GlobalSettings.Process.Path
@@ -187,9 +187,15 @@ function Get-ActionLogPath {
         [Parameter(Mandatory)][string]$ActionName
     )
 
-    $logDir = $Ctx.ConfigPath
-    if (-not (Test-Path $logDir)) {
-        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+    $logDir = Join-Path (Join-Path (Get-Item $PSScriptRoot ).Parent.FullName "logs") $Ctx.Key
+
+    # Only hit the filesystem once per directory per process run
+    if (-not $script:EnsuredLogDirs) { $script:EnsuredLogDirs = @{} }
+    if (-not $script:EnsuredLogDirs.ContainsKey($logDir)) {
+        if (-not (Test-Path $logDir)) {
+            New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+        }
+        $script:EnsuredLogDirs[$logDir] = $true
     }
 
     return Join-Path $logDir "$ActionName.log"
@@ -203,11 +209,13 @@ function Write-ActionLog {
 
     Write-Host $Message
 
-    if (-not (Test-Path $LogPath)) {
-        $parent = Split-Path $LogPath -Parent
+    $parent = Split-Path $LogPath -Parent
+    if (-not $script:EnsuredLogDirs) { $script:EnsuredLogDirs = @{} }
+    if (-not $script:EnsuredLogDirs.ContainsKey($parent)) {
         if (-not (Test-Path $parent)) {
             New-Item -Path $parent -ItemType Directory -Force | Out-Null
         }
+        $script:EnsuredLogDirs[$parent] = $true
     }
 
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")

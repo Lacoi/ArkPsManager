@@ -267,6 +267,7 @@ Function Update-Server {
     param
     (
         [Parameter(Mandatory=$true)][string]$TargetPath,
+        [string]$CachePath,
         [scriptblock]$LogAction
     )
 
@@ -289,7 +290,7 @@ Function Update-Server {
         "ShooterGame\Binaries\Win64\msdia140.dll"
     )
 
-    $cachePath = Join-Path $PSScriptRoot "..\..\Cache\Server"
+    $cachePath = if ($CachePath) { $CachePath } else { Join-Path (Get-Item $PSScriptRoot ).Parent.Parent.FullName "Cache\Server" }
 
     if (Test-Path $cachePath) {
         Invoke-SyncLog -LogAction $LogAction -Message "Updating server files from '$cachePath' to '$TargetPath'."
