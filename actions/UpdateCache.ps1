@@ -134,10 +134,18 @@ if ($LASTEXITCODE -ne 0) {
             Copy-Item -LiteralPath $installDir -Destination $buildCachePath -Recurse -Force
         }
 
-        # Keep only the 3 most recent versioned cache copies (by buildid)
+        # Keep only the 3 most recent versioned cache copies (by buildid); pinned builds never occupy a "keep" slot
         $installDirName = Split-Path $installDir -Leaf
         $installDirParent = Split-Path $installDir -Parent
-        $versionedDirs = Get-ChildItem -Path $installDirParent -Directory -Filter "$installDirName`_*" -ErrorAction SilentlyContinue |
+
+        $pinnedBuildIds = [System.Collections.Generic.HashSet[string]]::new()
+        Get-ChildItem -Path $installDirParent -Filter "*.build" -File -ErrorAction SilentlyContinue | ForEach-Object {
+            [void]$pinnedBuildIds.Add($_.BaseName)
+        }
+        $excludePatterns = @($pinnedBuildIds | ForEach-Object { "$installDirName`_$_" })
+
+        # -Exclude only takes effect when -Path points at a container's contents (trailing '\*')
+        $versionedDirs = Get-ChildItem -Path (Join-Path $installDirParent '*') -Directory -Filter "$installDirName`_*" -Exclude $excludePatterns -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -match "^$([regex]::Escape($installDirName))_(\d+)$" } |
             ForEach-Object { [PSCustomObject]@{ Path = $_.FullName; BuildId = [int64]$Matches[1] } } |
             Sort-Object BuildId -Descending

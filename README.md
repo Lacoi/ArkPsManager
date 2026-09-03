@@ -6,9 +6,9 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 
 - **Multi-server dashboard** ([App.ps1](App.ps1)) - add any number of server entries (map/instance), see live PID, session name, RAM usage and start time, and act on one or many selected entries at once.
 - **Shared local cache** ([actions/UpdateCache.ps1](actions/UpdateCache.ps1)) - installs SteamCMD on first run and keeps a single cached copy of the ARK server files (app `2430930`), so every server instance updates from disk instead of re-downloading from Steam.
-  - Detects the SteamCMD build id from `appmanifest_2430930.acf` and snapshots the cache into a versioned `Cache\Server_<buildid>` folder, automatically pruning old snapshots (keeps the latest 3).
+  - Detects the SteamCMD build id from `appmanifest_2430930.acf` and snapshots the cache into a versioned `Cache\Server_<buildid>` folder, automatically pruning old snapshots down to the latest 3 - any build with a matching `<buildid>.build` marker is never pruned, no matter how old.
   - Downloads the latest [AsaApi](https://github.com/ArkServerApi/AsaApi) release from GitHub, but only when the tagged version differs from the cached one (checked via a local `version.txt`).
-- **Build pinning** - drop a `<buildid>.build` marker file in `Cache\` to pin server updates to a specific cached build snapshot instead of the latest one.
+- **Build pinning** - drop a `<buildid>.build` marker file in `Cache\` to pin server updates to a specific cached build snapshot instead of the latest one. Set **Use Latest Build** on an individual entry (in the GUI, or `UseLatestBuild` in `config.json`) to make that one server ignore the pin and always update from the latest cache.
 - **Per-map INI merging** ([CreateServerSettings.ps1](CreateServerSettings.ps1), [actions/IniMerge](actions/IniMerge)) - maintain one shared `Base_Game.ini` / `Base_GameUserSettings.ini`, then layer per-map `*_Append.ini` / `*_Override.ini` overrides from `config/ini/<Key>/` to produce each server's final `config/maps/<Key>/config/*.ini`.
 - **Generated launch scripts** - per-map `run.json` (start options, URL options, command-line options, mods) is merged with a shared base `run.json` to generate each server's `RunServer.cmd`.
 - **Graceful shutdown** ([actions/Stop.ps1](actions/Stop.ps1), [actions/ArkRcon](actions/ArkRcon)) - broadcasts countdown warnings over RCON, ends early once no players are connected, saves the world, then shuts the server down.
@@ -32,6 +32,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 5. Click **UpdateCache** to install SteamCMD and download the ARK server files into the shared cache.
 6. Click **Create Server Settings** to generate each entry's merged INI files and `RunServer.cmd` from `config/ini`.
 7. Use the per-row **Start** / **Restart** / **Stop** / **Kill** / **Backup** / **Update** buttons (or the bulk-action buttons for multiple selected rows) to manage servers.
+8. If an update causes problems, click **Pin Previous Build** to roll `Update` back to the previous cached build (see [Build Pinning](#build-pinning)).
 
 ## Project Structure
 
@@ -73,7 +74,7 @@ logs/                      Per-server action logs (logs/<Key>/<Action>.log)
     "Shutdown": { "Time": 900, "ExitDelay": 5, "Messages": { "900": "...", "0": "..." } }
   },
   "Entries": [
-    { "Key": "TheIsland", "ServerPath": "C:\\ArkServer\\Server1" }
+    { "Key": "TheIsland", "ServerPath": "C:\\ArkServer\\Server1", "UseLatestBuild": false }
   ]
 }
 ```
@@ -89,6 +90,16 @@ For a map with `Key = "TheIsland"`, place any of the following under `config/ini
 - `run.json` (map name + per-map `startOptions`/`urlOptions`/`commandLineOptions`/`mods`)
 
 Running **Create Server Settings** merges these on top of the shared `config/ini/Base_*.ini` and `config/ini/run.json`, writing the result to `config/maps/TheIsland/config/*.ini` and `config/maps/TheIsland/config/RunServer.cmd`.
+
+## Build Pinning
+
+`UpdateCache.ps1` snapshots every successful SteamCMD update into a versioned `Cache\Server_<buildid>` folder and keeps only the latest 3 by default. To pin the server files used by [actions/Update.ps1](actions/Update.ps1) to a specific build:
+
+1. Run **UpdateCache** at least once while the build you want is current, so `Cache\Server_<buildid>` exists.
+2. Create an empty marker file named `<buildid>.build` (e.g. `25058578.build`) directly in `Cache\`, or click **Pin Previous Build** in the GUI to automatically pin the second-most-recent `Cache\Server_<buildid>` snapshot (useful for quickly rolling back after a bad update).
+3. Future `Update` actions resolve `<buildid>.build` (using the highest build id if more than one marker exists) and sync from `Cache\Server_<buildid>` instead of the default `Cache\Server`. Pinned builds are also exempt from the 3-snapshot pruning in `UpdateCache.ps1`.
+
+Check **Use Latest Build** on an entry (or set `"UseLatestBuild": true` in `config.json`) to make that specific server ignore any pin and always update from the latest cache, even while other servers stay pinned.
 
 ## Scheduling Actions with Task Scheduler
 

@@ -106,6 +106,7 @@ function Get-ActionContext {
         ProcessPath = $procSubPath
         GlobalSettings = $json.GlobalSettings
         BackupPath   = (Join-Path  $json.GlobalSettings.Backup.Path $entryJson.Key)
+        UseLatestBuild = [bool]$entryJson.UseLatestBuild
     }
 }
 

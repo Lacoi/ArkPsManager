@@ -23,19 +23,25 @@ try {
         Exit 1
     }
 
-    # A '<buildid>.build' marker file pins updates to a specific cached build, if that build's folder still exists
+    # A '<buildid>.build' marker file pins updates to a specific cached build, if that build's folder still exists.
+    # Entries with UseLatestBuild set skip this and always use the default (latest) cache.
     $cacheDir = Join-Path $actionsRoot "Cache"
     $serverCachePath = Join-Path $cacheDir "Server"
-    $buildFile = Get-ChildItem -Path $cacheDir -Filter "*.build" -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.BaseName -match '^\d+$' } |
-        Select-Object -First 1
-    if ($buildFile) {
-        $pinnedCachePath = Join-Path $cacheDir "Server_$($buildFile.BaseName)"
-        if (Test-Path -LiteralPath $pinnedCachePath -PathType Container) {
-            Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Pinned build '$($buildFile.BaseName)' found ($($buildFile.Name)). Using '$pinnedCachePath' as the server cache."
-            $serverCachePath = $pinnedCachePath
-        } else {
-            Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Pinned build file '$($buildFile.Name)' found, but '$pinnedCachePath' does not exist. Falling back to the default cache."
+    if ($ctx.UseLatestBuild) {
+        Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "UseLatestBuild is enabled for '$Key'; ignoring any pinned build."
+    } else {
+        $buildFile = Get-ChildItem -Path $cacheDir -Filter "*.build" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.BaseName -match '^\d+$' } |
+            Sort-Object { [int64]$_.BaseName } -Descending |
+            Select-Object -First 1
+        if ($buildFile) {
+            $pinnedCachePath = Join-Path $cacheDir "Server_$($buildFile.BaseName)"
+            if (Test-Path -LiteralPath $pinnedCachePath -PathType Container) {
+                Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Pinned build '$($buildFile.BaseName)' found ($($buildFile.Name)). Using '$pinnedCachePath' as the server cache."
+                $serverCachePath = $pinnedCachePath
+            } else {
+                Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Pinned build file '$($buildFile.Name)' found, but '$pinnedCachePath' does not exist. Falling back to the default cache."
+            }
         }
     }
 

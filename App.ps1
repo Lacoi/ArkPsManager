@@ -82,6 +82,7 @@ function Read-Config {
                         Key              = $e.Key
                         ServerPath       = $e.ServerPath
                         ConfigPath       = Join-Path $PSScriptRoot (Join-Path "config/maps" $e.Key)
+                        UseLatestBuild   = [bool]$e.UseLatestBuild
                         Pid              = $null   # runtime only, not persisted
                         RamGB            = $null   # runtime only, not persisted
                         StartTime        = $null   # runtime only, not persisted
@@ -111,8 +112,9 @@ function Save-Config {
     # so App.ps1 never overwrites GlobalSettings in config.json.
     $entriesToSave = $script:config.Entries | ForEach-Object {
         [PSCustomObject]@{
-            Key        = $_.Key
-            ServerPath = $_.ServerPath
+            Key            = $_.Key
+            ServerPath     = $_.ServerPath
+            UseLatestBuild = $_.UseLatestBuild
         }
     }
 
@@ -490,6 +492,41 @@ function Invoke-CreateServerSettings {
 }
 
 # ---------------------------
+# PinPreviousBuild action (standalone, pins Cache\Server_<buildid> for the 2nd-most-recent build)
+# ---------------------------
+function Invoke-PinPreviousBuild {
+    $cacheDir = Join-Path $PSScriptRoot "Cache"
+
+    $versionedDirs = Get-ChildItem -Path $cacheDir -Directory -Filter "Server_*" -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^Server_(\d+)$' } |
+        ForEach-Object { [PSCustomObject]@{ Path = $_.FullName; BuildId = [int64]$Matches[1] } } |
+        Sort-Object BuildId -Descending
+
+    if ($versionedDirs.Count -lt 2) {
+        [System.Windows.Forms.MessageBox]::Show("Need at least 2 versioned cache snapshots (Cache\Server_<buildid>) to pin the previous build. Run 'UpdateCache' a few times first.", "Info") | Out-Null
+        return
+    }
+
+    $previousBuild = $versionedDirs[1]
+
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        "Pin build $($previousBuild.BuildId) as the cache used by 'Update' for entries without 'Use Latest Build' checked?`n`nAny existing pin will be replaced.",
+        "Confirm Pin Previous Build",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+
+    try {
+        Get-ChildItem -Path $cacheDir -Filter "*.build" -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+        New-Item -Path (Join-Path $cacheDir "$($previousBuild.BuildId).build") -ItemType File -Force | Out-Null
+        [System.Windows.Forms.MessageBox]::Show("Pinned build $($previousBuild.BuildId).", "Pinned") | Out-Null
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Failed to pin build $($previousBuild.BuildId):`n$_", "Error") | Out-Null
+    }
+}
+
+# ---------------------------
 # Form
 # ---------------------------
 $form = New-Object System.Windows.Forms.Form
@@ -569,77 +606,83 @@ $btnReloadSettings.Add_Click({
 $grpEntry = New-Object System.Windows.Forms.GroupBox
 $grpEntry.Text = "Add / Edit Entry"
 $grpEntry.Location = New-Object System.Drawing.Point(15, 60)
-$grpEntry.Size = New-Object System.Drawing.Size(855, 130)
+$grpEntry.Size = New-Object System.Drawing.Size(855, 100)
 $form.Controls.Add($grpEntry)
 
 $lblKey = New-Object System.Windows.Forms.Label
 $lblKey.Text = "Key:"
 $lblKey.Location = New-Object System.Drawing.Point(15, 25)
-$lblKey.Size = New-Object System.Drawing.Size(90, 20)
+$lblKey.Size = New-Object System.Drawing.Size(40, 20)
 $grpEntry.Controls.Add($lblKey)
 
 $txtKey = New-Object System.Windows.Forms.TextBox
-$txtKey.Location = New-Object System.Drawing.Point(110, 22)
-$txtKey.Size = New-Object System.Drawing.Size(720, 24)
+$txtKey.Location = New-Object System.Drawing.Point(60, 22)
+$txtKey.Size = New-Object System.Drawing.Size(200, 24)
 $grpEntry.Controls.Add($txtKey)
 
 $lblServerPath = New-Object System.Windows.Forms.Label
 $lblServerPath.Text = "ServerPath:"
-$lblServerPath.Location = New-Object System.Drawing.Point(15, 55)
+$lblServerPath.Location = New-Object System.Drawing.Point(270, 25)
 $lblServerPath.Size = New-Object System.Drawing.Size(90, 20)
 $grpEntry.Controls.Add($lblServerPath)
 
 $txtServerPath = New-Object System.Windows.Forms.TextBox
-$txtServerPath.Location = New-Object System.Drawing.Point(110, 52)
-$txtServerPath.Size = New-Object System.Drawing.Size(720, 24)
+$txtServerPath.Location = New-Object System.Drawing.Point(365, 22)
+$txtServerPath.Size = New-Object System.Drawing.Size(465, 24)
 $grpEntry.Controls.Add($txtServerPath)
 
 $lblConfigPath = New-Object System.Windows.Forms.Label
 $lblConfigPath.Text = "ConfigPath:"
-$lblConfigPath.Location = New-Object System.Drawing.Point(15, 85)
+$lblConfigPath.Location = New-Object System.Drawing.Point(15, 55)
 $lblConfigPath.Size = New-Object System.Drawing.Size(90, 20)
 $grpEntry.Controls.Add($lblConfigPath)
 
 $txtConfigPath = New-Object System.Windows.Forms.TextBox
-$txtConfigPath.Location = New-Object System.Drawing.Point(110, 82)
-$txtConfigPath.Size = New-Object System.Drawing.Size(720, 24)
+$txtConfigPath.Location = New-Object System.Drawing.Point(110, 52)
+$txtConfigPath.Size = New-Object System.Drawing.Size(550, 24)
 $txtConfigPath.ReadOnly = $true
 $grpEntry.Controls.Add($txtConfigPath)
+
+$chkUseLatestBuild = New-Object System.Windows.Forms.CheckBox
+$chkUseLatestBuild.Text = "Use Latest Build"
+$chkUseLatestBuild.Location = New-Object System.Drawing.Point(670, 55)
+$chkUseLatestBuild.Size = New-Object System.Drawing.Size(160, 20)
+$grpEntry.Controls.Add($chkUseLatestBuild)
 
 # ---- Buttons for entry actions ----
 $btnAdd = New-Object System.Windows.Forms.Button
 $btnAdd.Text = "Add Entry"
-$btnAdd.Location = New-Object System.Drawing.Point(15, 200)
+$btnAdd.Location = New-Object System.Drawing.Point(15, 170)
 $btnAdd.Size = New-Object System.Drawing.Size(110, 28)
 $form.Controls.Add($btnAdd)
 
 $btnUpdate = New-Object System.Windows.Forms.Button
 $btnUpdate.Text = "Update Selected"
-$btnUpdate.Location = New-Object System.Drawing.Point(135, 200)
+$btnUpdate.Location = New-Object System.Drawing.Point(135, 170)
 $btnUpdate.Size = New-Object System.Drawing.Size(130, 28)
 $form.Controls.Add($btnUpdate)
 
 $btnRemove = New-Object System.Windows.Forms.Button
 $btnRemove.Text = "Remove Selected"
-$btnRemove.Location = New-Object System.Drawing.Point(275, 200)
+$btnRemove.Location = New-Object System.Drawing.Point(275, 170)
 $btnRemove.Size = New-Object System.Drawing.Size(130, 28)
 $form.Controls.Add($btnRemove)
 
 $btnClear = New-Object System.Windows.Forms.Button
 $btnClear.Text = "Clear Fields"
-$btnClear.Location = New-Object System.Drawing.Point(415, 200)
+$btnClear.Location = New-Object System.Drawing.Point(415, 170)
 $btnClear.Size = New-Object System.Drawing.Size(100, 28)
 $form.Controls.Add($btnClear)
 
 $btnRefreshProc = New-Object System.Windows.Forms.Button
 $btnRefreshProc.Text = "Refresh Processes"
-$btnRefreshProc.Location = New-Object System.Drawing.Point(745, 200)
+$btnRefreshProc.Location = New-Object System.Drawing.Point(745, 170)
 $btnRefreshProc.Size = New-Object System.Drawing.Size(125, 28)
 $form.Controls.Add($btnRefreshProc)
 
 # ---- System RAM usage bar (above the grid) ----
 $progressRam = New-Object System.Windows.Forms.ProgressBar
-$progressRam.Location = New-Object System.Drawing.Point(15, 230)
+$progressRam.Location = New-Object System.Drawing.Point(15, 208)
 $progressRam.Size = New-Object System.Drawing.Size(855, 16)
 $progressRam.Minimum = 0
 $progressRam.Maximum = 100
@@ -647,8 +690,8 @@ $form.Controls.Add($progressRam)
 
 # ---- DataGridView for entries (supports per-row action buttons + multi-select) ----
 $grid = New-Object System.Windows.Forms.DataGridView
-$grid.Location = New-Object System.Drawing.Point(15, 248)
-$grid.Size = New-Object System.Drawing.Size(855, 342)
+$grid.Location = New-Object System.Drawing.Point(15, 232)
+$grid.Size = New-Object System.Drawing.Size(855, 358)
 $grid.AllowUserToAddRows = $false
 $grid.AllowUserToDeleteRows = $false
 $grid.ReadOnly = $false
@@ -774,10 +817,19 @@ $form.Controls.Add($btnUpdateCache)
 
 $btnUpdateCache.Add_Click({ Invoke-UpdateCache })
 
+# ---- Pin Previous Build button (standalone action, no entry context) ----
+$btnPinPreviousBuild = New-Object System.Windows.Forms.Button
+$btnPinPreviousBuild.Text = "Pin Previous Build"
+$btnPinPreviousBuild.Location = New-Object System.Drawing.Point(145, 680)
+$btnPinPreviousBuild.Size = New-Object System.Drawing.Size(150, 28)
+$form.Controls.Add($btnPinPreviousBuild)
+
+$btnPinPreviousBuild.Add_Click({ Invoke-PinPreviousBuild })
+
 # ---- Auto-restart toggle (reflects/persists GlobalSettings.Process.RestartEnabled) ----
 $chkRestartEnabled = New-Object System.Windows.Forms.CheckBox
 $chkRestartEnabled.Text = "Auto-restart stopped servers"
-$chkRestartEnabled.Location = New-Object System.Drawing.Point(145, 685)
+$chkRestartEnabled.Location = New-Object System.Drawing.Point(305, 685)
 $chkRestartEnabled.Size = New-Object System.Drawing.Size(200, 20)
 $chkRestartEnabled.Checked = [bool]$script:config.GlobalSettings.Process.RestartEnabled
 $form.Controls.Add($chkRestartEnabled)
@@ -867,11 +919,13 @@ function Update-Grid {
             $txtKey.Text        = $entry.Key
             $txtServerPath.Text = $entry.ServerPath
             $txtConfigPath.Text = $entry.ConfigPath
+            $chkUseLatestBuild.Checked = [bool]$entry.UseLatestBuild
         }
     } else {
         $txtKey.Clear()
         $txtServerPath.Clear()
         $txtConfigPath.Clear()
+        $chkUseLatestBuild.Checked = $false
     }
 
     $runningEntries = @($script:config.Entries | Where-Object { $null -ne $_.RamGB })
@@ -935,6 +989,7 @@ function Clear-EntryFields {
     $txtKey.Clear()
     $txtServerPath.Clear()
     $txtConfigPath.Clear()
+    $chkUseLatestBuild.Checked = $false
     $grid.ClearSelection()
 }
 
@@ -986,6 +1041,7 @@ $btnAdd.Add_Click({
         Key              = $key
         ServerPath       = $txtServerPath.Text.Trim()
         ConfigPath       = Join-Path $PSScriptRoot (Join-Path "config/maps" $key)
+        UseLatestBuild   = $chkUseLatestBuild.Checked
         Pid              = $null
         RamGB            = $null
         StartTime        = $null
@@ -1019,6 +1075,7 @@ $btnUpdate.Add_Click({
     $script:config.Entries[$idx].Key        = $key
     $script:config.Entries[$idx].ServerPath = $txtServerPath.Text.Trim()
     $script:config.Entries[$idx].ConfigPath = Join-Path $PSScriptRoot (Join-Path "config/maps" $key)
+    $script:config.Entries[$idx].UseLatestBuild = $chkUseLatestBuild.Checked
     Update-ProcessMatches
     Reset-GridRows
     Clear-EntryFields
@@ -1065,11 +1122,13 @@ $grid.Add_SelectionChanged({
             $txtKey.Text        = $entry.Key
             $txtServerPath.Text = $entry.ServerPath
             $txtConfigPath.Text = $entry.ConfigPath
+            $chkUseLatestBuild.Checked = [bool]$entry.UseLatestBuild
         }
     } else {
         $txtKey.Clear()
         $txtServerPath.Clear()
         $txtConfigPath.Clear()
+        $chkUseLatestBuild.Checked = $false
     }
 })
 
