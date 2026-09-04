@@ -9,7 +9,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
   - Detects the SteamCMD build id from `appmanifest_2430930.acf` and snapshots the cache into a versioned `Cache\Server_<buildid>` folder, automatically pruning old snapshots down to the latest 3 - any build with a matching `<buildid>.build` marker is never pruned, no matter how old.
   - Downloads the latest [AsaApi](https://github.com/ArkServerApi/AsaApi) release from GitHub, but only when the tagged version differs from the cached one (checked via a local `version.txt`).
 - **Build pinning** - drop a `<buildid>.build` marker file in `Cache\` to pin server updates to a specific cached build snapshot instead of the latest one. Set **Use Latest Build** on an individual entry (in the GUI, or `UseLatestBuild` in `config.json`) to make that one server ignore the pin and always update from the latest cache.
-- **Per-map INI merging** ([CreateServerSettings.ps1](CreateServerSettings.ps1), [actions/IniMerge](actions/IniMerge)) - maintain one shared `Base_Game.ini` / `Base_GameUserSettings.ini`, then layer per-map `*_Append.ini` / `*_Override.ini` overrides from `config/ini/<Key>/` to produce each server's final `config/maps/<Key>/config/*.ini`.
+- **Per-map INI merging** ([actions/CreateServerSettings.ps1](CreateServerSettings.ps1), [actions/IniMerge](actions/IniMerge)) - maintain one shared `Base_Game.ini` / `Base_GameUserSettings.ini`, then layer per-map `*_Append.ini` / `*_Override.ini` overrides from `config/ini/<Key>/` to produce each server's final `config/maps/<Key>/config/*.ini`.
 - **Generated launch scripts** - per-map `run.json` (start options, URL options, command-line options, mods) is merged with a shared base `run.json` to generate each server's `RunServer.cmd`.
 - **Graceful shutdown** ([actions/Stop.ps1](actions/Stop.ps1), [actions/ArkRcon](actions/ArkRcon)) - broadcasts countdown warnings over RCON, ends early once no players are connected, saves the world, then shuts the server down.
 - **Zipped backups** ([actions/Backup.ps1](actions/Backup.ps1), [actions/ServerBackup](actions/ServerBackup)) - archives server config and save-game files (`.arkprofile`, `.arktribe`, etc.) to a timestamped zip.
@@ -39,7 +39,6 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 ```
 App.ps1                   Main WinForms dashboard (entry point)
 Settings.ps1              GlobalSettings editor dialog
-CreateServerSettings.ps1  Generates per-map INI files + RunServer.cmd from config/ini
 config.json               Persisted GlobalSettings + server Entries (Key/ServerPath)
 start.bat                 Launches App.ps1 hidden
 
@@ -47,12 +46,13 @@ actions/
   Common.ps1              Shared helpers: config/context loading, process matching, logging, action locks
   Start.ps1 / Stop.ps1 / Restart.ps1 / Kill.ps1
   Backup.ps1               Zips server config + save files
+  CreateServerSettings.ps1  Generates per-map INI files + RunServer.cmd from config/ini
   Update.ps1               Syncs server files/AsaApi/plugins from the shared cache
-  UpdateCache.ps1           Installs SteamCMD, updates the shared server cache, downloads AsaApi
+  UpdateCache.ps1          Installs SteamCMD, updates the shared server cache, downloads AsaApi
   ArkRcon/                 Minimal ARK RCON client module
   IniMerge/                INI read/merge/write module (duplicate-key aware)
-  ServerBackup/             Zip-backup module
-  ServerSync/               Folder-diff sync module used by Update.ps1
+  ServerBackup/            Zip-backup module
+  ServerSync/              Folder-diff sync module used by Update.ps1
 
 config/
   ini/                     Base_Game.ini, Base_GameUserSettings.ini, base run.json, per-map overrides

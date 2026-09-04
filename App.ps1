@@ -465,7 +465,7 @@ function Invoke-UpdateCache {
 # CreateServerSettings action (standalone, no arguments passed at all)
 # ---------------------------
 function Invoke-CreateServerSettings {
-    $scriptPath = Join-Path $PSScriptRoot "CreateServerSettings.ps1"
+    $scriptPath = Join-Path $script:actionsFolder "CreateServerSettings.ps1"
 
     $check = Test-ActionScript -ScriptPath $scriptPath
     if (-not $check.IsValid) {

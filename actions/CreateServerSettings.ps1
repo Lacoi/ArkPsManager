@@ -1,15 +1,17 @@
 [CmdletBinding(SupportsShouldProcess)]
 param()
 
-. (Join-Path $PSScriptRoot "actions\Common.ps1")
-Import-Module (Join-Path $PSScriptRoot 'actions\IniMerge') -Force -ErrorAction Stop
+. (Join-Path $PSScriptRoot "Common.ps1")
 
-$logPath = Join-Path $PSScriptRoot "logs/CreateServerSettings.log"
+$actionsRoot = Split-Path $PSScriptRoot -Parent
+Import-Module (Join-Path $PSScriptRoot 'IniMerge') -Force -ErrorAction Stop
+
+$logPath = Join-Path $actionsRoot "logs/CreateServerSettings.log"
 Write-ActionLog -LogPath $logPath -Message "=== Create CreateServerSettings Start ==="
 
-$baseGusIniPath = Join-Path $PSScriptRoot 'config\ini\Base_GameUserSettings.ini'
-$baseGameIniPath = Join-Path $PSScriptRoot 'config\ini\Base_Game.ini'
-$appendRoot = Join-Path $PSScriptRoot 'config\ini'
+$baseGusIniPath = Join-Path $actionsRoot 'config\ini\Base_GameUserSettings.ini'
+$baseGameIniPath = Join-Path $actionsRoot 'config\ini\Base_Game.ini'
+$appendRoot = Join-Path $actionsRoot 'config\ini'
 $baseRunJsonPath = Join-Path $appendRoot 'run.json'
 
 if (-not (Test-Path -LiteralPath $baseGusIniPath -PathType Leaf)) {
@@ -22,7 +24,7 @@ if (-not (Test-Path -LiteralPath $baseRunJsonPath -PathType Leaf)) {
     throw "Base run configuration not found: $baseRunJsonPath"
 }
 
-$config = Get-Content -LiteralPath (Join-Path $PSScriptRoot "config.json") -Raw -ErrorAction Stop | ConvertFrom-Json
+$config = Get-Content -LiteralPath (Join-Path $actionsRoot "config.json") -Raw -ErrorAction Stop | ConvertFrom-Json
 
 # Parse the shared base once, then merge it independently for every server.
 $baseGusIni = Read-IniFile -FilePath $baseGusIniPath
@@ -46,7 +48,7 @@ foreach ($entry in $config.Entries) {
 
     foreach ($iniFile in $iniFileTypes) {
         $mergedIni = if ($iniFile -eq "GameUserSettings") { $baseGusIni } else { $baseGameIni }
-        $outputPath = Join-Path $PSScriptRoot (Join-Path "config\maps" (Join-Path $entry.Key "config\$($iniFile).ini"))
+        $outputPath = Join-Path $actionsRoot (Join-Path "config\maps" (Join-Path $entry.Key "config\$($iniFile).ini"))
         $hasMergeFile = $false
 
         foreach ($strategy in $mergeStrategies) {
@@ -102,7 +104,7 @@ foreach ($entry in $config.Entries) {
         $arguments += "-mods=$($mods -join ',')"
     }
     $command = "start `"#$($entry.Key)`" $($startOptions -join ' ') `"$serverExecutable`" $serverUrl $($arguments -join ' ')".Trim() -replace ' {2,}', ' '
-    $runServerPath = Join-Path $PSScriptRoot (Join-Path 'config\maps' (Join-Path $entry.Key 'config\RunServer.cmd'))
+    $runServerPath = Join-Path $actionsRoot (Join-Path 'config\maps' (Join-Path $entry.Key 'config\RunServer.cmd'))
 
     $runFileCount++
     if ($PSCmdlet.ShouldProcess($runServerPath, "$($entry.Key): Write RunServer.cmd")) {

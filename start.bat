@@ -1,1 +1,1 @@
-PowerShell.exe -WindowStyle hidden -File App.ps1
+PowerShell.exe -ExecutionPolicy Bypass  -WindowStyle hidden -File App.ps1
