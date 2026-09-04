@@ -337,6 +337,29 @@ function Test-ActionScript {
 }
 
 # ---------------------------
+# ServerPath validation helper - rejects UNC paths and drive letters mapped to network shares
+# ---------------------------
+function Test-LocalDrivePath {
+    param(
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $true }
+
+    if ($Path -match '^\\\\') { return $false }
+
+    $driveLetter = ($Path -split ':', 2)[0]
+    if ([string]::IsNullOrWhiteSpace($driveLetter) -or $driveLetter.Length -ne 1) { return $false }
+
+    try {
+        $driveInfo = [System.IO.DriveInfo]::new("$driveLetter`:")
+        return $driveInfo.DriveType -eq [System.IO.DriveType]::Fixed
+    } catch {
+        return $false
+    }
+}
+
+# ---------------------------
 # Global action functions (one per button, triggered with the entry's Key)
 # ---------------------------
 function Invoke-EntryAction {
@@ -1037,9 +1060,14 @@ $btnAdd.Add_Click({
         [System.Windows.Forms.MessageBox]::Show("An entry with this Key already exists.", "Info") | Out-Null
         return
     }
+    $serverPath = $txtServerPath.Text.Trim()
+    if (-not (Test-LocalDrivePath -Path $serverPath)) {
+        [System.Windows.Forms.MessageBox]::Show("ServerPath must be on a local (fixed) hard drive, not a UNC path or network drive.", "Info") | Out-Null
+        return
+    }
     [void]$script:config.Entries.Add([PSCustomObject]@{
         Key              = $key
-        ServerPath       = $txtServerPath.Text.Trim()
+        ServerPath       = $serverPath
         ConfigPath       = Join-Path $PSScriptRoot (Join-Path "config/maps" $key)
         UseLatestBuild   = $chkUseLatestBuild.Checked
         Pid              = $null
@@ -1072,8 +1100,13 @@ $btnUpdate.Add_Click({
         [System.Windows.Forms.MessageBox]::Show("Key is required.", "Info") | Out-Null
         return
     }
+    $serverPath = $txtServerPath.Text.Trim()
+    if (-not (Test-LocalDrivePath -Path $serverPath)) {
+        [System.Windows.Forms.MessageBox]::Show("ServerPath must be on a local (fixed) hard drive, not a UNC path or network drive.", "Info") | Out-Null
+        return
+    }
     $script:config.Entries[$idx].Key        = $key
-    $script:config.Entries[$idx].ServerPath = $txtServerPath.Text.Trim()
+    $script:config.Entries[$idx].ServerPath = $serverPath
     $script:config.Entries[$idx].ConfigPath = Join-Path $PSScriptRoot (Join-Path "config/maps" $key)
     $script:config.Entries[$idx].UseLatestBuild = $chkUseLatestBuild.Checked
     Update-ProcessMatches
