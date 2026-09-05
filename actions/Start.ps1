@@ -22,11 +22,8 @@ try {
         Exit 1
     }
 
-    Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message "Updating cache before starting the server..."
-    Update-Server -TargetPath $ctx.ServerPath -LogAction {
-        param([string]$Message)
-        Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message $Message
-    }
+    # Update the server cache and plugins before starting the server
+    & (Join-Path $PSScriptRoot "Update.ps1") -Key $Key
 
     # Copy ini files from config to server path
     $iniConfigPath = Join-Path $ctx.ConfigPath "config"
@@ -38,19 +35,14 @@ try {
         New-Item -Path $iniDestPath -ItemType Directory -Force | Out-Null
     }
     Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message "Copying ini files from $iniConfigPath to $iniDestPath..."
-    Get-ChildItem -LiteralPath $iniConfigPath -Force | Copy-Item -Destination $iniDestPath -Recurse -Force
-
-    # Copy plugin files from config to server path
-    $pluginPath = Join-Path $ctx.ConfigPath "plugin"
-    if (Test-Path $pluginPath) {
-        Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message "Copying plugin files from $pluginPath to $(Join-Path $ctx.ServerPath "ShooterGame\Binaries\Win64\ArkApi")..."
-        Copy-Item -Path $pluginPath -Destination (Join-Path $ctx.ServerPath "ShooterGame\Binaries\Win64\ArkApi") -Recurse -Force
-    }
+    Get-ChildItem -LiteralPath $iniConfigPath -Filter "*.ini" -File -Force | Copy-Item -Destination $iniDestPath -Force
 
     # little break, after file copy, to avoid file locks when starting the server
-    Start-Sleep -Seconds 2
+    Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message "Waiting 5 seconds before starting the server to avoid file locks..."
+    Start-Sleep -Seconds 5
 
-    $runscriptPath = Join-Path (Join-Path $ctx.ServerPath $ctx.GlobalSettings.Startup.Path) "$($ctx.GlobalSettings.Startup.File)"
+    #$runscriptPath = Join-Path (Join-Path $ctx.ServerPath $ctx.GlobalSettings.Startup.Path) "$($ctx.GlobalSettings.Startup.File)"
+    $runscriptPath = Join-Path (Join-Path $ctx.ConfigPath "config") "$($ctx.GlobalSettings.Startup.File)"
     if (-not (Test-Path $runscriptPath -PathType Leaf)) {
         Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message "Executable not found: $runscriptPath"
         Start-Sleep -Seconds 10
