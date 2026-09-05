@@ -1101,6 +1101,10 @@ $btnUpdate.Add_Click({
         return
     }
     $serverPath = $txtServerPath.Text.Trim()
+    if ([string]::IsNullOrWhiteSpace($serverPath)) {
+        [System.Windows.Forms.MessageBox]::Show("ServerPath is required.", "Info") | Out-Null
+        return
+    }
     if (-not (Test-LocalDrivePath -Path $serverPath)) {
         [System.Windows.Forms.MessageBox]::Show("ServerPath must be on a local (fixed) hard drive, not a UNC path or network drive.", "Info") | Out-Null
         return

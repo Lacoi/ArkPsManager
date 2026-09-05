@@ -31,6 +31,10 @@ function Backup-ArkServer {
         [scriptblock]$LogAction
     )
 
+    if ([string]::IsNullOrWhiteSpace($DestinationPath)) {
+        throw "Destination path is not specified."
+    }
+
     if (-not (Test-Path $SourcePath)) {
         throw "Source path '$SourcePath' does not exist."
     }
