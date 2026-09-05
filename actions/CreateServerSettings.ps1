@@ -49,10 +49,12 @@ foreach ($entry in $config.Entries) {
     foreach ($iniFile in $iniFileTypes) {
         $mergedIni = if ($iniFile -eq "GameUserSettings") { $baseGusIni } else { $baseGameIni }
         $outputPath = Join-Path $actionsRoot (Join-Path "config\maps" (Join-Path $entry.Key "config\$($iniFile).ini"))
+        #$outputPath = [System.IO.Path]::Combine($actionsRoot, 'config', 'maps', $entry.Key, 'config', "$($iniFile).ini")
         $hasMergeFile = $false
 
         foreach ($strategy in $mergeStrategies) {
             $mergeIniPath = Join-Path $appendRoot (Join-Path $entry.Key "$($iniFile)_$($strategy).ini")
+            #$mergeIniPath = [System.IO.Path]::Combine($appendRoot, $entry.Key, "$($iniFile)_$($strategy).ini")
             if (-not (Test-Path -LiteralPath $mergeIniPath -PathType Leaf)) {
                 continue
             }
@@ -76,6 +78,7 @@ foreach ($entry in $config.Entries) {
     }
 
     $entryRunJsonPath = Join-Path $appendRoot (Join-Path $entry.Key 'run.json')
+    #$entryRunJsonPath = [System.IO.Path]::Combine($appendRoot, $entry.Key, 'run.json')
     if (-not (Test-Path -LiteralPath $entryRunJsonPath -PathType Leaf)) {
         Write-ActionLog -LogPath $logPath -Message "[$($entry.Key)] Skipping RunServer.cmd: run configuration not found at '$entryRunJsonPath'."
         continue
@@ -98,13 +101,15 @@ foreach ($entry in $config.Entries) {
         -not [string]::IsNullOrWhiteSpace([string]$_)
     } | Select-Object -Unique
     $serverExecutable = Join-Path $entry.ServerPath (Join-Path $config.GlobalSettings.Process.Path "$($config.GlobalSettings.Startup.Name).exe")
+    #$serverExecutable = [System.IO.Path]::Combine($entry.ServerPath, $config.GlobalSettings.Process.Path, "$($config.GlobalSettings.Startup.Name).exe")
     $serverUrl = $entryRunConfig.map + '?' + ($urlOptions -join '?')
     $arguments = @($commandLineOptions)
     if ($mods.Count -gt 0) {
         $arguments += "-mods=$($mods -join ',')"
     }
     $command = "start `"#$($entry.Key)`" $($startOptions -join ' ') `"$serverExecutable`" $serverUrl $($arguments -join ' ')".Trim() -replace ' {2,}', ' '
-    $runServerPath = Join-Path $actionsRoot (Join-Path 'config\maps' (Join-Path $entry.Key 'config\RunServer.cmd'))
+    $runServerPath = Join-Path $actionsRoot (Join-Path 'config\maps' (Join-Path $entry.Key (Join-Path 'config' $config.GlobalSettings.Startup.File)))
+    #$runServerPath = [System.IO.Path]::Combine($actionsRoot, 'config', 'maps', $entry.Key, 'config', $config.GlobalSettings.Startup.File)
 
     $runFileCount++
     if ($PSCmdlet.ShouldProcess($runServerPath, "$($entry.Key): Write RunServer.cmd")) {
