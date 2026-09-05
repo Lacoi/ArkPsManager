@@ -57,6 +57,7 @@ actions/
 config/
   ini/                     Base_Game.ini, Base_GameUserSettings.ini, base run.json, per-map overrides
   maps/                    Generated per-map config output (config/maps/<Key>/config, RunServer.cmd)
+  api/                     Default ark api config.json
 
 cache/                     Shared SteamCMD + server file cache (created automatically)
 logs/                      Per-server action logs (logs/<Key>/<Action>.log)

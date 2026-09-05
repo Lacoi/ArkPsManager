@@ -1,7 +1,8 @@
 param(
     [string]$Key,
     [string]$ConfigJsonPath=(Get-Item $PSScriptRoot ).Parent.FullName + "\config.json",
-    [switch]$SkipServerUpdate
+    [switch]$SkipServerUpdate,
+    [switch]$FastExit
 )
 
 . (Join-Path $PSScriptRoot "Common.ps1")
@@ -20,7 +21,7 @@ if (-not $actionLock) {
 try {
     if ($null -ne $ctx.Pid) {
         Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Server '$($ctx.Key)' is running with PID $($ctx.Pid)."
-        Start-Sleep -Seconds 10
+        if (-not $FastExit) { Start-Sleep -Seconds 10 }
         Exit 1
     }
 
@@ -53,7 +54,7 @@ try {
         $items = Get-ChildItem -Path $serverCachePath -ErrorAction SilentlyContinue | Select-Object -First 1
         if (-not $items) {
             Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Cache is empty. Please run the 'UpdateCache' action first."
-            Start-Sleep -Seconds 10
+            if (-not $FastExit) { Start-Sleep -Seconds 10 }
             Exit 1
         }
 
@@ -128,7 +129,7 @@ try {
         Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "PluginConfig Update failed: $_"
     }
 
-    Start-Sleep -Seconds 10
+    if (-not $FastExit) { Start-Sleep -Seconds 10 }
     Exit 0
 } finally {
     Exit-ActionLock -Mutex $actionLock

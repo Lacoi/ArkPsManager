@@ -23,7 +23,10 @@ try {
     }
 
     # Update the server cache and plugins before starting the server
-    & (Join-Path $PSScriptRoot "Update.ps1") -Key $Key
+    & (Join-Path $PSScriptRoot "Update.ps1") -Key $Key -FastExit
+    if ($LASTEXITCODE -ne 0) {
+        Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message "Update action failed, but we hope, that everything is working. :)"
+    }
 
     # Copy ini files from config to server path
     $iniConfigPath = Join-Path $ctx.ConfigPath "config"
