@@ -80,8 +80,8 @@ try {
                 Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message $Message
             }
 
-            # Copy the config.json file from the ini folder to the server path, overwriting any existing file
-            Copy-Item -Path (Join-Path $actionsRoot 'ini\api\config.json') -Destination (Join-Path $apiPath 'config.json') -Force -ErrorAction SilentlyContinue
+            # Copy the config.json file from the config api folder to the server path, overwriting any existing file
+            Copy-Item -Path (Join-Path $actionsRoot 'config\api\config.json') -Destination (Join-Path $apiPath 'config.json') -Force -ErrorAction SilentlyContinue
         }
     } catch {
         Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "ArkApi Update failed: $_"
