@@ -27,7 +27,7 @@ function Show-SettingsDialog {
     # ---- Dialog form ----
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = "Global Settings"
-    $dlg.Size = New-Object System.Drawing.Size(700, 880)
+    $dlg.Size = New-Object System.Drawing.Size(700, 900)
     $dlg.StartPosition = "CenterScreen"
     $dlg.FormBorderStyle = "FixedDialog"
     $dlg.MaximizeBox = $false
@@ -166,22 +166,57 @@ function Show-SettingsDialog {
     $numStartupDelay.Value = [Math]::Max(0, [Math]::Min(3600, [int]$gs.Startup.Delay))
     $grpStartup.Controls.Add($numStartupDelay)
 
+    # ---- Backup settings ----
+    $grpBackup = New-Object System.Windows.Forms.GroupBox
+    $grpBackup.Text = "Backup"
+    $grpBackup.Location = New-Object System.Drawing.Point(15, 400)
+    $grpBackup.Size = New-Object System.Drawing.Size(645, 95)
+    $dlg.Controls.Add($grpBackup)
+
     $lblBackupPath = New-Object System.Windows.Forms.Label
-    $lblBackupPath.Text = "Backup.Path:"
-    $lblBackupPath.Location = New-Object System.Drawing.Point(15, 410)
+    $lblBackupPath.Text = "Path:"
+    $lblBackupPath.Location = New-Object System.Drawing.Point(15, 25)
     $lblBackupPath.Size = New-Object System.Drawing.Size(120, 20)
-    $dlg.Controls.Add($lblBackupPath)
+    $grpBackup.Controls.Add($lblBackupPath)
 
     $txtBackupPath = New-Object System.Windows.Forms.TextBox
-    $txtBackupPath.Location = New-Object System.Drawing.Point(150, 407)
-    $txtBackupPath.Size = New-Object System.Drawing.Size(500, 24)
+    $txtBackupPath.Location = New-Object System.Drawing.Point(150, 22)
+    $txtBackupPath.Size = New-Object System.Drawing.Size(480, 24)
     $txtBackupPath.Text = $gs.Backup.Path
-    $dlg.Controls.Add($txtBackupPath)
+    $grpBackup.Controls.Add($txtBackupPath)
+
+    $lblBackupDailyToKeep = New-Object System.Windows.Forms.Label
+    $lblBackupDailyToKeep.Text = "DailyToKeep:"
+    $lblBackupDailyToKeep.Location = New-Object System.Drawing.Point(15, 55)
+    $lblBackupDailyToKeep.Size = New-Object System.Drawing.Size(120, 20)
+    $grpBackup.Controls.Add($lblBackupDailyToKeep)
+
+    $numBackupDailyToKeep = New-Object System.Windows.Forms.NumericUpDown
+    $numBackupDailyToKeep.Location = New-Object System.Drawing.Point(150, 52)
+    $numBackupDailyToKeep.Size = New-Object System.Drawing.Size(110, 24)
+    $numBackupDailyToKeep.Minimum = 0
+    $numBackupDailyToKeep.Maximum = 3650
+    $numBackupDailyToKeep.Value = [Math]::Max(0, [Math]::Min(3650, [int]$gs.Backup.DailyToKeep))
+    $grpBackup.Controls.Add($numBackupDailyToKeep)
+
+    $lblBackupWeeklyToKeep = New-Object System.Windows.Forms.Label
+    $lblBackupWeeklyToKeep.Text = "WeeklyToKeep:"
+    $lblBackupWeeklyToKeep.Location = New-Object System.Drawing.Point(280, 55)
+    $lblBackupWeeklyToKeep.Size = New-Object System.Drawing.Size(120, 20)
+    $grpBackup.Controls.Add($lblBackupWeeklyToKeep)
+
+    $numBackupWeeklyToKeep = New-Object System.Windows.Forms.NumericUpDown
+    $numBackupWeeklyToKeep.Location = New-Object System.Drawing.Point(410, 52)
+    $numBackupWeeklyToKeep.Size = New-Object System.Drawing.Size(110, 24)
+    $numBackupWeeklyToKeep.Minimum = 0
+    $numBackupWeeklyToKeep.Maximum = 520
+    $numBackupWeeklyToKeep.Value = [Math]::Max(0, [Math]::Min(520, [int]$gs.Backup.WeeklyToKeep))
+    $grpBackup.Controls.Add($numBackupWeeklyToKeep)
 
     # ---- Shutdown settings ----
     $grpShutdown = New-Object System.Windows.Forms.GroupBox
     $grpShutdown.Text = "Shutdown"
-    $grpShutdown.Location = New-Object System.Drawing.Point(15, 450)
+    $grpShutdown.Location = New-Object System.Drawing.Point(15, 505)
     $grpShutdown.Size = New-Object System.Drawing.Size(645, 330)
     $dlg.Controls.Add($grpShutdown)
 
@@ -306,13 +341,13 @@ function Show-SettingsDialog {
 
     $btnOk = New-Object System.Windows.Forms.Button
     $btnOk.Text = "Save"
-    $btnOk.Location = New-Object System.Drawing.Point(490, 800)
+    $btnOk.Location = New-Object System.Drawing.Point(490, 845)
     $btnOk.Size = New-Object System.Drawing.Size(80, 30)
     $dlg.Controls.Add($btnOk)
 
     $btnCancel = New-Object System.Windows.Forms.Button
     $btnCancel.Text = "Cancel"
-    $btnCancel.Location = New-Object System.Drawing.Point(580, 800)
+    $btnCancel.Location = New-Object System.Drawing.Point(580, 845)
     $btnCancel.Size = New-Object System.Drawing.Size(80, 30)
     $dlg.Controls.Add($btnCancel)
 
@@ -332,6 +367,8 @@ function Show-SettingsDialog {
         $latest.GlobalSettings.Startup.File = $txtStartupFile.Text.Trim()
         $latest.GlobalSettings.Startup.Delay = [int]$numStartupDelay.Value
         $latest.GlobalSettings.Backup.Path = $txtBackupPath.Text.Trim()
+        $latest.GlobalSettings.Backup.DailyToKeep = [int]$numBackupDailyToKeep.Value
+        $latest.GlobalSettings.Backup.WeeklyToKeep = [int]$numBackupWeeklyToKeep.Value
 
         $messages = [ordered]@{}
         foreach ($item in $lvMessages.Items) {

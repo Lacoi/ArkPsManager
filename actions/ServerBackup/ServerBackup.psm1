@@ -203,3 +203,114 @@ function Backup-ArkServer {
     Invoke-BackupLog -LogAction $LogAction -Message $message
     return $zipPath
 }
+
+# ---------------------------
+# Invoke-BackupRetention
+# ---------------------------
+function Invoke-BackupRetention {
+    <#
+    .SYNOPSIS
+        Prunes old Backup-ArkServer zip files using a daily + weekly retention policy.
+
+    .DESCRIPTION
+        Keeps every backup created within the last -DailyRetentionDays days. Beyond that
+        window, keeps only the most recent -WeeklyBackupsToKeep Sunday backups (one per
+        week, using the latest backup of each Sunday if there's more than one). Everything
+        else is deleted.
+
+        Backups are matched by the "..._yyyyMMdd_HHmmss.zip" naming used by Backup-ArkServer;
+        files that don't match this pattern are left untouched.
+
+    .PARAMETER BackupPath
+        Folder containing the zip backups for a single server.
+
+    .PARAMETER DailyRetentionDays
+        Number of days of daily backups to keep (default 7).
+
+    .PARAMETER WeeklyBackupsToKeep
+        Number of additional weekly (Sunday) backups to keep beyond the daily window (default 4).
+
+    .PARAMETER LogAction
+        Optional scriptblock invoked with a single string message for logging.
+
+    .EXAMPLE
+        Invoke-BackupRetention -BackupPath 'C:\Backup\ArkAsaNew\TheIsland' -DailyRetentionDays 7 -WeeklyBackupsToKeep 4
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BackupPath,
+
+        [Parameter(Mandatory = $false)]
+        [int]$DailyRetentionDays = 7,
+
+        [Parameter(Mandatory = $false)]
+        [int]$WeeklyBackupsToKeep = 4,
+
+        [Parameter(Mandatory = $false)]
+        [scriptblock]$LogAction
+    )
+
+    if (-not (Test-Path -LiteralPath $BackupPath)) {
+        Invoke-BackupLog -LogAction $LogAction -Message "Backup path not found, nothing to prune: '$BackupPath'."
+        return
+    }
+
+    $backups = Get-ChildItem -LiteralPath $BackupPath -Filter '*.zip' -File -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            if ($_.BaseName -match '_(\d{8}_\d{6})$') {
+                [pscustomobject]@{
+                    File      = $_
+                    Timestamp = [datetime]::ParseExact($Matches[1], 'yyyyMMdd_HHmmss', $null)
+                }
+            }
+        } |
+        Where-Object { $_ } |
+        Sort-Object Timestamp -Descending
+
+    if ($backups.Count -eq 0) {
+        Invoke-BackupLog -LogAction $LogAction -Message "No timestamped backups found in '$BackupPath'."
+        return
+    }
+
+    $dailyCutoff = (Get-Date).Date.AddDays(-$DailyRetentionDays)
+    $keep = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    # Keep everything inside the daily retention window
+    foreach ($backup in $backups) {
+        if ($backup.Timestamp -ge $dailyCutoff) {
+            [void]$keep.Add($backup.File.FullName)
+        }
+    }
+
+    # Keep the N most recent distinct Sunday backups (one per week), even outside the daily window
+    $weeklyCandidates = $backups |
+        Where-Object { $_.Timestamp.DayOfWeek -eq [DayOfWeek]::Sunday } |
+        Group-Object { $_.Timestamp.Date } |
+        ForEach-Object { $_.Group | Sort-Object Timestamp -Descending | Select-Object -First 1 } |
+        Sort-Object Timestamp -Descending |
+        Select-Object -First $WeeklyBackupsToKeep
+
+    foreach ($backup in $weeklyCandidates) {
+        [void]$keep.Add($backup.File.FullName)
+    }
+
+    $removed = 0
+    foreach ($backup in $backups) {
+        if ($keep.Contains($backup.File.FullName)) { continue }
+
+        if ($PSCmdlet.ShouldProcess($backup.File.FullName, "Remove old backup")) {
+            try {
+                Remove-Item -LiteralPath $backup.File.FullName -Force
+                Invoke-BackupLog -LogAction $LogAction -Message "Removed old backup: $($backup.File.FullName)"
+                $removed++
+            } catch {
+                $message = "Failed to remove old backup '$($backup.File.FullName)': $($_.Exception.Message)"
+                Write-Warning $message
+                Invoke-BackupLog -LogAction $LogAction -Message $message
+            }
+        }
+    }
+
+    Invoke-BackupLog -LogAction $LogAction -Message "Backup retention complete: kept $($keep.Count), removed $removed."
+}

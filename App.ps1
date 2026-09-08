@@ -49,6 +49,8 @@ function Get-DefaultConfig {
             }
             Backup = [PSCustomObject]@{
                 Path = "E:\Backup\ArkAsaNew"
+                DailyToKeep = 7
+                WeeklyToKeep = 4
             }
         }
         Entries = @()

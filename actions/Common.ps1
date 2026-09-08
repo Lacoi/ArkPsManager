@@ -193,6 +193,7 @@ function Get-ActionLogPath {
     # Only hit the filesystem once per directory per process run
     if (-not $script:EnsuredLogDirs) { $script:EnsuredLogDirs = @{} }
     if (-not $script:EnsuredLogDirs.ContainsKey($logDir)) {
+
         if (-not (Test-Path $logDir)) {
             New-Item -Path $logDir -ItemType Directory -Force | Out-Null
         }
@@ -200,6 +201,36 @@ function Get-ActionLogPath {
     }
 
     return Join-Path $logDir "$ActionName.log"
+}
+
+# ---------------------------
+# Log rotation - rotates a log once it reaches 1MB, keeping only the 10 most recent rotated files
+# ---------------------------
+function Invoke-LogRotation {
+    param(
+        [Parameter(Mandatory)][string]$LogPath
+    )
+
+    $maxLogSizeBytes = 1MB
+    $maxRotatedLogs = 10
+
+    $file = Get-Item -LiteralPath $LogPath -ErrorAction SilentlyContinue
+    if (-not $file -or $file.Length -lt $maxLogSizeBytes) { return }
+
+    $rotatedName = "$($file.Name).$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+    try {
+        Rename-Item -LiteralPath $LogPath -NewName $rotatedName -Force -ErrorAction Stop
+    } catch {
+        return
+    }
+
+    $logDir = Split-Path $LogPath -Parent
+    $rotatedLogs = Get-ChildItem -Path $logDir -Filter "$($file.Name).*" -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending
+
+    foreach ($old in ($rotatedLogs | Select-Object -Skip $maxRotatedLogs)) {
+        Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Write-ActionLog {
@@ -217,6 +248,9 @@ function Write-ActionLog {
             New-Item -Path $parent -ItemType Directory -Force | Out-Null
         }
         $script:EnsuredLogDirs[$parent] = $true
+        
+        # Rotate the log if it already exists and is larger than 1MB
+        Invoke-LogRotation -LogPath $LogPath
     }
 
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")

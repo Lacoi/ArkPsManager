@@ -16,10 +16,17 @@ if (-not $actionLock) {
 }
 
 try {
+
     Backup-ArkServer -SourcePath $ctx.ServerPath -DestinationPath $ctx.BackupPath -ArkExtensions @('.arkprofile', '.arktribe', '.arktributetribe', '.profilebak', '.tribebak') -LogAction {
         param([string]$Message)
         Write-ActionMessage -Ctx $ctx -ActionName "Backup" -Message $Message
     }
+
+    Invoke-BackupRetention -BackupPath $ctx.BackupPath -DailyRetentionDays $(if ($ctx.GlobalSettings.Backup.DailyToKeep) { [int]$ctx.GlobalSettings.Backup.DailyToKeep } else { 7 }) -WeeklyBackupsToKeep $(if ($ctx.GlobalSettings.Backup.WeeklyToKeep) { [int]$ctx.GlobalSettings.Backup.WeeklyToKeep } else { 4 }) -LogAction {
+        param([string]$Message)
+        Write-ActionMessage -Ctx $ctx -ActionName "Backup" -Message $Message
+    }
+
     Write-ActionMessage -Ctx $ctx -ActionName "Backup" -Message "Backup completed"
     Start-Sleep -Seconds 10
     Exit 0

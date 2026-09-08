@@ -3,21 +3,23 @@
                            "Process":  {
                                            "Name":  "ArkAscendedServer",
                                            "Path":  "ShooterGame\\Binaries\\Win64",
-                                           "restartTime":  120,
-                                           "restartEnabled":  true
+                                           "RestartTime":  300,
+                                           "RestartEnabled":  true
                                        },
                            "Ini":  {
                                        "Path":  "ShooterGame\\Saved\\Config\\WindowsServer",
                                        "File":  "GameUserSettings.ini"
                                    },
                            "Startup":  {
-                                           "Name": "ArkAscendedServer",
+                                           "Name":  "ArkAscendedServer",
                                            "Path":  "ShooterGame\\Saved\\Config\\WindowsServer",
                                            "File":  "RunServer.cmd",
                                            "Delay":  5
                                        },
                            "Backup":  {
-                                          "Path":  "C:\\Backup\\ArkAsa"
+                                          "Path":  "C:\\Backup\\ArkAsa",
+                                          "DailyToKeep":  30,
+                                          "WeeklyToKeep":  4
                                       },
                            "Shutdown":  {
                                             "Time":  900,
@@ -34,7 +36,8 @@
     "Entries":  [
                     {
                         "Key":  "Testserver",
-                        "ServerPath":  "C:\\ArkServer\\Server0"
+                        "ServerPath":  "C:\\ArkServer\\Server0",
+                        "UseLatestBuild":  true
                     }
                 ]
 }
