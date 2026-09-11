@@ -83,15 +83,15 @@ function Backup-ArkServer {
             $mapName   = $mapSubFolder.Name
             $entryRoot = "SavedArks\$mapName"
 
-            foreach ($ext in $ArkExtensions) {
-                Get-ChildItem -Path $mapSubFolder.FullName -Filter "*$ext" -File -ErrorAction SilentlyContinue |
-                    ForEach-Object {
-                        $filePlan.Add([pscustomobject]@{
-                            SourceFile = $_.FullName
-                            EntryName  = Join-Path $entryRoot $_.Name
-                        })
-                    }
-            }
+            # -Include only takes effect when -Path points at a container's contents (trailing '\*')
+            $extensionPatterns = $ArkExtensions | ForEach-Object { "*$_" }
+            Get-ChildItem -Path (Join-Path $mapSubFolder.FullName '*') -Include $extensionPatterns -File -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    $filePlan.Add([pscustomobject]@{
+                        SourceFile = $_.FullName
+                        EntryName  = Join-Path $entryRoot $_.Name
+                    })
+                }
 
             # Locate the .ark save file matching the subfolder name (inside the subfolder)
             $arkFile = Join-Path $mapSubFolder.FullName "$mapName.ark"
