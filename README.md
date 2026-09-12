@@ -4,7 +4,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 
 ## Features
 
-- **Multi-server dashboard** ([App.ps1](App.ps1)) - add any number of server entries (map/instance), see live PID, session name, RAM usage and start time, and act on one or many selected entries at once.
+- **Multi-server dashboard** ([App.ps1](App.ps1)) - add any number of server entries (map/instance), see live PID, session name, RAM usage and start time, and act on one or many selected entries at once. `ServerPath` is validated to be on a local fixed drive (not a UNC path or mapped network share) before an entry is saved.
 - **Shared local cache** ([actions/UpdateCache.ps1](actions/UpdateCache.ps1)) - installs SteamCMD on first run and keeps a single cached copy of the ARK server files (app `2430930`), so every server instance updates from disk instead of re-downloading from Steam.
   - Detects the SteamCMD build id from `appmanifest_2430930.acf` and snapshots the cache into a versioned `Cache\Server_<buildid>` folder, automatically pruning old snapshots down to the latest 3 - any build with a matching `<buildid>.build` marker is never pruned, no matter how old.
   - Downloads the latest [AsaApi](https://github.com/ArkServerApi/AsaApi) release from GitHub, but only when the tagged version differs from the cached one (checked via a local `version.txt`).
@@ -12,9 +12,9 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 - **Per-map INI merging** ([actions/CreateServerSettings.ps1](CreateServerSettings.ps1), [actions/IniMerge](actions/IniMerge)) - maintain one shared `Base_Game.ini` / `Base_GameUserSettings.ini`, then layer per-map `*_Append.ini` / `*_Override.ini` overrides from `config/ini/<Key>/` to produce each server's final `config/maps/<Key>/config/*.ini`.
 - **Generated launch scripts** - per-map `run.json` (start options, URL options, command-line options, mods) is merged with a shared base `run.json` to generate each server's `RunServer.cmd`.
 - **Graceful shutdown** ([actions/Stop.ps1](actions/Stop.ps1), [actions/ArkRcon](actions/ArkRcon)) - broadcasts countdown warnings over RCON, ends early once no players are connected, saves the world, then shuts the server down.
-- **Zipped backups** ([actions/Backup.ps1](actions/Backup.ps1), [actions/ServerBackup](actions/ServerBackup)) - archives server config and save-game files (`.arkprofile`, `.arktribe`, etc.) to a timestamped zip.
+- **Zipped backups** ([actions/Backup.ps1](actions/Backup.ps1), [actions/ServerBackup](actions/ServerBackup)) - archives server config and save-game files (`.arkprofile`, `.arktribe`, etc.) to a timestamped zip, then prunes old backups using a daily + weekly retention policy (see [Backup Retention](#backup-retention)). Fails fast if `GlobalSettings.Backup.Path` doesn't exist (e.g. an external backup drive isn't connected).
 - **Auto-restart** - optionally restarts a server automatically if it has been stopped for longer than a configurable time.
-- **Action log per server** - every action writes to `logs/<Key>/<Action>.log`, in addition to the live output shown in each action's own PowerShell window.
+- **Action log per server** - every action writes to `logs/<Key>/<Action>.log`, in addition to the live output shown in each action's own PowerShell window. Logs auto-rotate once they reach 1MB, keeping the 10 most recent rotated files per log.
 
 ## Requirements
 
@@ -71,7 +71,7 @@ logs/                      Per-server action logs (logs/<Key>/<Action>.log)
     "Process": { "Name": "ArkAscendedServer", "Path": "ShooterGame\\Binaries\\Win64", "RestartTime": 300, "RestartEnabled": true },
     "Ini":     { "Path": "ShooterGame\\Saved\\Config\\WindowsServer", "File": "GameUserSettings.ini" },
     "Startup": { "Name": "ArkAscendedServer", "Path": "ShooterGame\\Saved\\Config\\WindowsServer", "File": "RunServer.cmd", "Delay": 5 },
-    "Backup":  { "Path": "C:\\Backup\\ArkAsaNew" },
+    "Backup":  { "Path": "C:\\Backup\\ArkAsaNew", "DailyToKeep": 7, "WeeklyToKeep": 4 },
     "Shutdown": { "Time": 900, "ExitDelay": 5, "Messages": { "900": "...", "0": "..." } }
   },
   "Entries": [
@@ -101,6 +101,18 @@ Running **Create Server Settings** merges these on top of the shared `config/ini
 3. Future `Update` actions resolve `<buildid>.build` (using the highest build id if more than one marker exists) and sync from `Cache\Server_<buildid>` instead of the default `Cache\Server`. Pinned builds are also exempt from the 3-snapshot pruning in `UpdateCache.ps1`.
 
 Check **Use Latest Build** on an entry (or set `"UseLatestBuild": true` in `config.json`) to make that specific server ignore any pin and always update from the latest cache, even while other servers stay pinned.
+
+Run `Update.ps1` with `-SkipServerUpdate` to sync only ArkApi/plugins/plugin-config from the cache and skip the server-file sync entirely (e.g. to push a plugin update without touching the game files).
+
+## Backup Retention
+
+After each **Backup**, `Invoke-BackupRetention` ([actions/ServerBackup](actions/ServerBackup)) prunes that entry's zip backups using a daily + weekly policy, configured via **Settings** (`GlobalSettings.Backup.DailyToKeep` / `WeeklyToKeep`):
+
+- Every backup created within the last `DailyToKeep` days is kept.
+- Beyond that window, the most recent `WeeklyToKeep` Sunday backups are also kept (one per week - the latest backup of that Sunday if there's more than one).
+- Everything else is deleted.
+
+Backups are matched by the `..._yyyyMMdd_HHmmss.zip` naming `Backup-ArkServer` already uses, so files that don't match this pattern are left untouched.
 
 ## Scheduling Actions with Task Scheduler
 
@@ -141,4 +153,4 @@ Repeat with a different `-TaskName`, `$action` script/args and `$trigger` for ot
 
 ## Logs
 
-Each action logs to `logs/<Key>/<ActionName>.log` via `Write-ActionLog` in [actions/Common.ps1](actions/Common.ps1), in addition to writing to the console of the action's own PowerShell window.
+Each action logs to `logs/<Key>/<ActionName>.log` via `Write-ActionLog` in [actions/Common.ps1](actions/Common.ps1), in addition to writing to the console of the action's own PowerShell window. Once a log file reaches 1MB, it's rotated to `<ActionName>.log.<yyyyMMdd_HHmmss>` and a fresh log is started; only the 10 most recent rotated files are kept per log.
