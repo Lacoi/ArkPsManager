@@ -767,7 +767,7 @@ $colPid = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colPid.Name = "Pid"
 $colPid.HeaderText = "PID"
 $colPid.SortMode = "NotSortable"
-$colPid.Width = 60
+$colPid.Width = 67
 $colPid.ReadOnly = $true
 [void]$grid.Columns.Add($colPid)
 
@@ -783,7 +783,7 @@ $colRam = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colRam.Name = "RamGB"
 $colRam.HeaderText = "RAM (GB)"
 $colRam.SortMode = "NotSortable"
-$colRam.Width = 80
+$colRam.Width = 62
 $colRam.ReadOnly = $true
 [void]$grid.Columns.Add($colRam)
 
@@ -791,7 +791,7 @@ $colCpu = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colCpu.Name = "CpuPercent"
 $colCpu.HeaderText = "CPU %"
 $colCpu.SortMode = "NotSortable"
-$colCpu.Width = 70
+$colCpu.Width = 55
 $colCpu.ReadOnly = $true
 [void]$grid.Columns.Add($colCpu)
 
@@ -799,7 +799,7 @@ $colStart = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colStart.Name = "StartTime"
 $colStart.HeaderText = "Start Time"
 $colStart.SortMode = "NotSortable"
-$colStart.Width = 130
+$colStart.Width = 100
 $colStart.ReadOnly = $true
 [void]$grid.Columns.Add($colStart)
 
@@ -813,12 +813,12 @@ function New-ActionButtonColumn($name, $text, $width) {
     return $col
 }
 
-[void]$grid.Columns.Add((New-ActionButtonColumn "BtnStart"   "Start"   60))
-[void]$grid.Columns.Add((New-ActionButtonColumn "BtnRestart" "Restart" 65))
-[void]$grid.Columns.Add((New-ActionButtonColumn "BtnStop"    "Stop"    55))
-[void]$grid.Columns.Add((New-ActionButtonColumn "BtnKill"    "Kill"    55))
-[void]$grid.Columns.Add((New-ActionButtonColumn "BtnBackup"  "Backup"  65))
-[void]$grid.Columns.Add((New-ActionButtonColumn "BtnUpdate"  "Update"  65))
+[void]$grid.Columns.Add((New-ActionButtonColumn "BtnStart"   "Start"   58))
+[void]$grid.Columns.Add((New-ActionButtonColumn "BtnRestart" "Restart" 63))
+[void]$grid.Columns.Add((New-ActionButtonColumn "BtnStop"    "Stop"    53))
+[void]$grid.Columns.Add((New-ActionButtonColumn "BtnKill"    "Kill"    53))
+[void]$grid.Columns.Add((New-ActionButtonColumn "BtnBackup"  "Backup"  63))
+[void]$grid.Columns.Add((New-ActionButtonColumn "BtnUpdate"  "Update"  63))
 
 # ---- Bulk action buttons (apply the same action to all selected rows) ----
 $grpBulk = New-Object System.Windows.Forms.GroupBox
@@ -963,7 +963,7 @@ function Update-Grid {
         $sessionText = if ($entry.SessionName) { $entry.SessionName } else { "-" }
         $ramText = if ($null -ne $entry.RamGB) { "{0:N2}" -f $entry.RamGB } else { "-" }
         $cpuText = if ($null -ne $entry.CpuPercent) { "{0:N1}" -f $entry.CpuPercent } else { "-" }
-        $startText = if ($entry.StartTime) { $entry.StartTime.ToString("dd.MM.yyyy HH:mm:ss") } else { if ($entry.StoppedSince) { "off: " + $entry.StoppedSince.ToString("dd.MM.yyyy HH:mm:ss") } else { "-" } }
+        $startText = if ($entry.StartTime) { $entry.StartTime.ToString("dd.MM. HH:mm:ss") } else { if ($entry.StoppedSince) { "off: " + $entry.StoppedSince.ToString("dd.MM.yyyy HH:mm:ss") } else { "-" } }
 
         if ($row.Cells["Pid"].Value -ne $pidText) { $row.Cells["Pid"].Value = $pidText }
         if ($row.Cells["SessionName"].Value -ne $sessionText) { $row.Cells["SessionName"].Value = $sessionText }
