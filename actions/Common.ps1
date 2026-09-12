@@ -120,20 +120,23 @@ function Test-ProcessRunning {
         return $false
     }
 
-    $baseName = $Ctx.ProcessName -replace '\.exe$', ''
-    $exePath = (Join-Path (Join-Path $Ctx.ServerPath $Ctx.ProcessPath) $baseName).ToLowerInvariant()
-
     try {
+        $baseName = $Ctx.ProcessName -replace '\.exe$', ''
         $procs = Get-Process -Name $baseName -ErrorAction SilentlyContinue
+        $expectedPath = (Join-Path $Ctx.ServerPath $Ctx.ProcessPath).TrimEnd('\').ToLowerInvariant()
+
         foreach ($proc in $procs) {
-            $procPath = $null
-            try { $procPath = $proc.Path } catch { continue }
-            if ($procPath -and $procPath.ToLowerInvariant() -eq $exePath) {
+            $exePath = $null
+            try { $exePath = $proc.Path } catch { continue }
+            if (-not $exePath) { continue }
+            $procDir = (Split-Path $exePath -Parent).TrimEnd('\').ToLowerInvariant()
+            if ($procDir -eq $expectedPath) {
                 $result = $proc.Id
                 try { $proc.Dispose() } catch { }
                 return $result
             }
         }
+
         foreach ($proc in $procs) { 
             try { $proc.Dispose() } catch { } 
         }
