@@ -87,46 +87,67 @@ try {
         Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "ArkApi Update failed: $_"
     }
 
-    # Update plugins from the default cache (if present) and then from the map-specific cache (if present)
-    # first remove all existing plugins from the server path to avoid leaving old plugins behind when updating
+    # Update plugins: copy new/changed files from the default and map-specific plugin caches
+    # (map-specific wins on name conflicts, since it's applied second), then remove anything from
+    # PluginPath that's no longer in either source - one combined diff instead of two independent
+    # mirrors, which would delete and re-copy each other's files on every run.
     $pluginPath = Join-Path $ctx.ServerPath (Join-Path $ctx.ProcessPath "ArkApi\Plugins")
-    Remove-Item -LiteralPath $pluginPath -Recurse -Force -ErrorAction SilentlyContinue
+    $defaultPluginCache = Join-Path $actionsRoot "Cache\AsaApiPlugins"
+    $mapPluginCache = Join-Path $actionsRoot (Join-Path "config\maps" (Join-Path $ctx.Key "plugins"))
+    $defaultPluginCacheExists = Test-Path -LiteralPath $defaultPluginCache -PathType Container
+    $mapPluginCacheExists = Test-Path -LiteralPath $mapPluginCache -PathType Container
 
-    # sync the default plugin cache to the server path, if present
     try {
-        $pluginCachePath = Join-Path $actionsRoot "Cache\AsaApiPlugins"
-        $items = Get-ChildItem -Path $pluginCachePath -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $items) {
-            Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Plugin cache is empty. Skipping update. Please run the 'UpdateCache' action first."
+        if (-not $defaultPluginCacheExists -and -not $mapPluginCacheExists) {
+            Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Plugin caches not found. Skipping update. Please run the 'UpdateCache' action first."
         } else {
-            Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Updating plugins..."
+            if ($defaultPluginCacheExists) {
+                Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Updating plugins..."
+                Sync-Folder -Source $defaultPluginCache -Target $pluginPath -Verbose -LogAction {
+                    param([string]$Message)
+                    Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message $Message
+                }
+            }
 
-            Sync-Folder -Source $pluginCachePath -Target $pluginPath -Verbose -LogAction {
-                param([string]$Message)
-                Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message $Message
+            # map-specific plugins layer on top of, and take precedence over, the default cache
+            if ($mapPluginCacheExists) {
+                Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Updating PluginConfig..."
+                Sync-Folder -Source $mapPluginCache -Target $pluginPath -Verbose -LogAction {
+                    param([string]$Message)
+                    Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message $Message
+                }
+            }
+
+            # build the combined set of relative paths that should exist, from both sources
+            $expectedRelativePaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            foreach ($cachePath in @($defaultPluginCache, $mapPluginCache)) {
+                if (-not (Test-Path -LiteralPath $cachePath -PathType Container)) { continue }
+                $resolvedCache = (Resolve-Path -LiteralPath $cachePath).ProviderPath.TrimEnd('\', '/')
+                Get-ChildItem -LiteralPath $resolvedCache -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                    [void]$expectedRelativePaths.Add($_.FullName.Substring($resolvedCache.Length).TrimStart('\', '/'))
+                }
+            }
+
+            # delete anything in PluginPath that's not present in either source
+            if (Test-Path -LiteralPath $pluginPath -PathType Container) {
+                $resolvedTarget = (Resolve-Path -LiteralPath $pluginPath).ProviderPath.TrimEnd('\', '/')
+                Get-ChildItem -LiteralPath $resolvedTarget -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                    $relativePath = $_.FullName.Substring($resolvedTarget.Length).TrimStart('\', '/')
+                    if (-not $expectedRelativePaths.Contains($relativePath)) {
+                        Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Removing orphaned plugin file: $relativePath"
+                        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
+                    }
+                }
+
+                # clean up any folders left empty by the deletions above (deepest first)
+                Get-ChildItem -LiteralPath $resolvedTarget -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+                    Sort-Object { $_.FullName.Length } -Descending |
+                    Where-Object { -not (Get-ChildItem -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue | Select-Object -First 1) } |
+                    Remove-Item -Force -ErrorAction SilentlyContinue
             }
         }
     } catch {
         Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Plugin Update failed: $_"
-    }
-
-    # sync the map-specific plugin cache to the server path, if present
-    # this allows for map-specific plugins to be installed, e.g. for modded maps
-    try {
-        $pluginCachePath = Join-Path $actionsRoot (Join-Path "config\maps" (Join-Path $ctx.Key "plugins"))
-        $items = Get-ChildItem -Path $pluginCachePath -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $items) {
-            Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "PluginConfig cache is empty. Skipping update. Please run the 'UpdateCache' action first."
-        } else {
-            Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Updating PluginConfig..."
-
-            Sync-Folder -Source $pluginCachePath -Target $pluginPath -Verbose -LogAction {
-                param([string]$Message)
-                Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message $Message
-            }
-        }
-    } catch {
-        Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "PluginConfig Update failed: $_"
     }
 
     if (-not $FastExit) { Start-Sleep -Seconds 10 }
