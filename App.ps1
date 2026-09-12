@@ -87,6 +87,7 @@ function Read-Config {
                         UseLatestBuild   = [bool]$e.UseLatestBuild
                         Pid              = $null   # runtime only, not persisted
                         RamGB            = $null   # runtime only, not persisted
+                        CpuPercent       = $null   # runtime only, not persisted
                         StartTime        = $null   # runtime only, not persisted
                         SessionName      = $null   # runtime only, cached at startup / manual refresh
                         StoppedSince     = $null   # runtime only, used by the auto-restart check
@@ -235,6 +236,7 @@ function Update-ProcessMatches {
         $entry.Pid = $null
         $entry.RamGB = $null
         $entry.StartTime = $null
+        $entry.CpuPercent = $null
     }
 
     if ([string]::IsNullOrWhiteSpace($procName)) {
@@ -259,6 +261,11 @@ function Update-ProcessMatches {
         }
     }
 
+    # CPU% needs two TotalProcessorTime samples over a wall-clock interval; only matched PIDs are kept each pass
+    if (-not $script:cpuSamples) { $script:cpuSamples = @{} }
+    $newCpuSamples = @{}
+    $now = Get-Date
+
     foreach ($entry in $script:config.Entries) {
         if ([string]::IsNullOrWhiteSpace($entry.ServerPath)) { continue }
 
@@ -269,8 +276,30 @@ function Update-ProcessMatches {
             $entry.Pid = $matchedProc.Id
             $entry.RamGB = [math]::Round($matchedProc.WorkingSet64 / 1GB, 2)
             try { $entry.StartTime = $matchedProc.StartTime } catch { }
+
+            try {
+                $cpuTime = $matchedProc.TotalProcessorTime
+                $prevSample = $script:cpuSamples[$matchedProc.Id]
+                # Only trust the previous sample if it's the same process instance (StartTime matches)
+                if ($prevSample -and $entry.StartTime -and $prevSample.ProcStartTime -eq $entry.StartTime) {
+                    $elapsedMs = ($now - $prevSample.SampleTime).TotalMilliseconds
+                    if ($elapsedMs -gt 0) {
+                        $cpuDeltaMs = ($cpuTime - $prevSample.CpuTime).TotalMilliseconds
+                        $cpuPercent = ($cpuDeltaMs / $elapsedMs / [Environment]::ProcessorCount) * 100
+                        $entry.CpuPercent = [math]::Round([math]::Max(0, $cpuPercent), 1)
+                    }
+                }
+                $newCpuSamples[$matchedProc.Id] = [PSCustomObject]@{
+                    CpuTime      = $cpuTime
+                    SampleTime   = $now
+                    ProcStartTime = $entry.StartTime
+                }
+            } catch { }
         }
     }
+
+    # Drop samples for PIDs no longer matched, so the cache doesn't grow unbounded
+    $script:cpuSamples = $newCpuSamples
 
     # Process objects hold native handles - dispose now that values have been copied out
     foreach ($proc in $procs) { 
@@ -758,6 +787,14 @@ $colRam.Width = 80
 $colRam.ReadOnly = $true
 [void]$grid.Columns.Add($colRam)
 
+$colCpu = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+$colCpu.Name = "CpuPercent"
+$colCpu.HeaderText = "CPU %"
+$colCpu.SortMode = "NotSortable"
+$colCpu.Width = 70
+$colCpu.ReadOnly = $true
+[void]$grid.Columns.Add($colCpu)
+
 $colStart = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colStart.Name = "StartTime"
 $colStart.HeaderText = "Start Time"
@@ -859,10 +896,6 @@ $chkRestartEnabled.Size = New-Object System.Drawing.Size(200, 20)
 $chkRestartEnabled.Checked = [bool]$script:config.GlobalSettings.Process.RestartEnabled
 $form.Controls.Add($chkRestartEnabled)
 
-$chkRestartEnabled.Add_CheckedChanged({
-    Set-RestartEnabled -Enabled $chkRestartEnabled.Checked
-})
-
 # ---- CreateServerSettings button (standalone action, no entry context) ----
 $btnCreateServerSettings = New-Object System.Windows.Forms.Button
 $btnCreateServerSettings.Text = "Create Server Settings"
@@ -929,11 +962,13 @@ function Update-Grid {
         $pidText = if ($entry.Pid) { [string]$entry.Pid + $pidRestartText } else { "-" + $pidRestartText }
         $sessionText = if ($entry.SessionName) { $entry.SessionName } else { "-" }
         $ramText = if ($null -ne $entry.RamGB) { "{0:N2}" -f $entry.RamGB } else { "-" }
+        $cpuText = if ($null -ne $entry.CpuPercent) { "{0:N1}" -f $entry.CpuPercent } else { "-" }
         $startText = if ($entry.StartTime) { $entry.StartTime.ToString("dd.MM.yyyy HH:mm:ss") } else { if ($entry.StoppedSince) { "off: " + $entry.StoppedSince.ToString("dd.MM.yyyy HH:mm:ss") } else { "-" } }
 
         if ($row.Cells["Pid"].Value -ne $pidText) { $row.Cells["Pid"].Value = $pidText }
         if ($row.Cells["SessionName"].Value -ne $sessionText) { $row.Cells["SessionName"].Value = $sessionText }
         if ($row.Cells["RamGB"].Value -ne $ramText) { $row.Cells["RamGB"].Value = $ramText }
+        if ($row.Cells["CpuPercent"].Value -ne $cpuText) { $row.Cells["CpuPercent"].Value = $cpuText }
         if ($row.Cells["StartTime"].Value -ne $startText) { $row.Cells["StartTime"].Value = $startText }
     }
 
@@ -1074,6 +1109,7 @@ $btnAdd.Add_Click({
         UseLatestBuild   = $chkUseLatestBuild.Checked
         Pid              = $null
         RamGB            = $null
+        CpuPercent       = $null
         StartTime        = $null
         SessionName      = $null
         StoppedSince     = $null
@@ -1151,6 +1187,11 @@ $btnRefreshProc.Add_Click({
     Update-AutorestartFlags
     Update-SessionNames
     Update-Grid
+})
+
+$chkRestartEnabled.Add_CheckedChanged({
+    Update-AutorestartFlags
+    Set-RestartEnabled -Enabled $chkRestartEnabled.Checked
 })
 
 $grid.Add_SelectionChanged({
