@@ -1,5 +1,7 @@
 # ServerManager
 
+> This project is a personal sandbox for testing and learning how AI coding agents work - most of the code here was written with AI assistance. It's also actively used to manage my own ARK server/cluster.
+
 A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: Survival Ascended** dedicated servers from a single machine - start/stop/restart/kill, RCON-based graceful shutdowns, zipped backups, SteamCMD-based caching, and automatic [AsaApi](https://github.com/ArkServerApi/AsaApi) plugin-loader updates.
 
 ## Features
