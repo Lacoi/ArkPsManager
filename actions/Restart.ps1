@@ -32,10 +32,10 @@ try {
         }
     } else {
         Write-ActionMessage -Ctx $ctx -ActionName "Restart" -Message "No running process found for '$($ctx.Key)', proceeding to start."
+        
+        # Backup the server after stopping
+        & (Join-Path $PSScriptRoot "Backup.ps1") -Key $Key -ConfigJsonPath $ConfigJsonPath
     }
-
-    # Backup the server after stopping
-    & (Join-Path $PSScriptRoot "Backup.ps1") -Key $Key -ConfigJsonPath $ConfigJsonPath
 
     Write-ActionMessage -Ctx $ctx -ActionName "Restart" -Message "Starting '$($ctx.Key)'..."
     & (Join-Path $PSScriptRoot "Start.ps1") -Key $Key -ConfigJsonPath $ConfigJsonPath
