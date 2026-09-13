@@ -12,6 +12,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 - **Build pinning** - drop a `<buildid>.build` marker file in `Cache\` to pin server updates to a specific cached build snapshot instead of the latest one. Set **Use Latest Build** on an individual entry (in the GUI, or `UseLatestBuild` in `config.json`) to make that one server ignore the pin and always update from the latest cache.
 - **Per-map INI merging** ([actions/CreateServerSettings.ps1](CreateServerSettings.ps1), [actions/IniMerge](actions/IniMerge)) - maintain one shared `Base_Game.ini` / `Base_GameUserSettings.ini`, then layer per-map `*_Append.ini` / `*_Override.ini` overrides from `config/ini/<Key>/` to produce each server's final `config/maps/<Key>/config/*.ini`.
 - **Generated launch scripts** - per-map `run.json` (start options, URL options, command-line options, mods) is merged with a shared base `run.json` to generate each server's `RunServer.cmd`.
+- **Server Settings editor** ([ServerSettings.ps1](ServerSettings.ps1)) - a standalone WinForms GUI (launched via **Edit Server Settings**) for editing the raw `config/ini` source files directly: the shared `(Global)` `Base_Game.ini` / `Base_GameUserSettings.ini` / `run.json`, or any per-map `Game_Append.ini` / `Game_Override.ini` / `GameUserSettings_Append.ini` / `GameUserSettings_Override.ini` / `run.json` under `config/ini/<Key>/`. Saving skips/deletes files left empty instead of writing blank files, so untouched overrides aren't created.
 - **Graceful shutdown** ([actions/Stop.ps1](actions/Stop.ps1), [actions/ArkRcon](actions/ArkRcon)) - broadcasts countdown warnings over RCON, ends early once no players are connected, saves the world, then shuts the server down.
 - **Zipped backups** ([actions/Backup.ps1](actions/Backup.ps1), [actions/ServerBackup](actions/ServerBackup)) - archives server config and save-game files (`.arkprofile`, `.arktribe`, etc.) to a timestamped zip, then prunes old backups using a daily + weekly retention policy (see [Backup Retention](#backup-retention)). Fails fast if `GlobalSettings.Backup.Path` doesn't exist (e.g. an external backup drive isn't connected).
 - **Auto-restart** - optionally restarts a server automatically if it has been stopped for longer than a configurable time.
@@ -31,7 +32,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 3. Click **Settings** to configure `GlobalSettings` (process name/path, ini path, startup script, backup path, shutdown timings/messages).
 4. Click **Add Entry**, give it a `Key` (used as the folder name under `config/maps/<Key>`) and the target `ServerPath` for that instance, then **Add Entry**.
 5. Click **UpdateCache** to install SteamCMD and download the ARK server files into the shared cache.
-6. Click **Create Server Settings** to generate each entry's merged INI files and `RunServer.cmd` from `config/ini`.
+6. Click **Generate Server Settings** to merge each entry's INI/`run.json` sources from `config/ini` into `config/maps/<Key>/config/*.ini` and `RunServer.cmd` (use **Edit Server Settings** first if you need to edit those source files).
 7. Use the per-row **Start** / **Restart** / **Stop** / **Kill** / **Backup** / **Update** buttons (or the bulk-action buttons for multiple selected rows) to manage servers.
 8. If an update causes problems, click **Pin Previous Build** to roll `Update` back to the previous cached build (see [Build Pinning](#build-pinning)).
 
@@ -40,6 +41,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 ```
 App.ps1                   Main WinForms dashboard (entry point)
 Settings.ps1              GlobalSettings editor dialog
+ServerSettings.ps1        Standalone GUI for editing config/ini source files (Global + per-map)
 config.json               Persisted GlobalSettings + server Entries (Key/ServerPath)
 start.bat                 Launches App.ps1 hidden
 
@@ -91,7 +93,7 @@ For a map with `Key = "TheIsland"`, place any of the following under `config/ini
 - `Game_Append.ini` / `Game_Override.ini`
 - `run.json` (map name + per-map `startOptions`/`urlOptions`/`commandLineOptions`/`mods`)
 
-Running **Create Server Settings** merges these on top of the shared `config/ini/Base_*.ini` and `config/ini/run.json`, writing the result to `config/maps/TheIsland/config/*.ini` and `config/maps/TheIsland/config/RunServer.cmd`.
+Running **Generate Server Settings** merges these on top of the shared `config/ini/Base_*.ini` and `config/ini/run.json`, writing the result to `config/maps/TheIsland/config/*.ini` and `config/maps/TheIsland/config/RunServer.cmd`. Use **Edit Server Settings** to edit any of these source files (Global or per-map) directly from a GUI instead of by hand.
 
 ## Build Pinning
 

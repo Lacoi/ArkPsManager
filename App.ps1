@@ -546,6 +546,35 @@ function Invoke-CreateServerSettings {
 }
 
 # ---------------------------
+# EditServerSettings action (standalone, launches the ServerSettings.ps1 ini editor GUI)
+# ---------------------------
+function Invoke-EditServerSettings {
+    $scriptPath = Join-Path $PSScriptRoot "ServerSettings.ps1"
+
+    $check = Test-ActionScript -ScriptPath $scriptPath
+    if (-not $check.IsValid) {
+        [System.Windows.Forms.MessageBox]::Show(
+            $check.Reason,
+            "Action Script Unavailable",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $argList = @(
+        "-ExecutionPolicy", "Bypass"
+        "-File", "`"$scriptPath`""
+    )
+
+    try {
+        Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Normal
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error launching 'ServerSettings.ps1':`n$_", "Script Error") | Out-Null
+    }
+}
+
+# ---------------------------
 # PinPreviousBuild action (standalone, pins Cache\Server_<buildid> for the 2nd-most-recent build)
 # ---------------------------
 function Invoke-PinPreviousBuild {
@@ -896,11 +925,20 @@ $chkRestartEnabled.Size = New-Object System.Drawing.Size(200, 20)
 $chkRestartEnabled.Checked = [bool]$script:config.GlobalSettings.Process.RestartEnabled
 $form.Controls.Add($chkRestartEnabled)
 
+# ---- EditServerSettings button (standalone action, no entry context) ----
+$btnEditServerSettings = New-Object System.Windows.Forms.Button
+$btnEditServerSettings.Text = "Edit Server Settings"
+$btnEditServerSettings.Location = New-Object System.Drawing.Point(550, 680)
+$btnEditServerSettings.Size = New-Object System.Drawing.Size(150, 28)
+$form.Controls.Add($btnEditServerSettings)
+
+$btnEditServerSettings.Add_Click({ Invoke-EditServerSettings })
+
 # ---- CreateServerSettings button (standalone action, no entry context) ----
 $btnCreateServerSettings = New-Object System.Windows.Forms.Button
-$btnCreateServerSettings.Text = "Create Server Settings"
-$btnCreateServerSettings.Location = New-Object System.Drawing.Point(680, 680)
-$btnCreateServerSettings.Size = New-Object System.Drawing.Size(190, 28)
+$btnCreateServerSettings.Text = "Generate Server Settings"
+$btnCreateServerSettings.Location = New-Object System.Drawing.Point(710, 680)
+$btnCreateServerSettings.Size = New-Object System.Drawing.Size(160, 28)
 $form.Controls.Add($btnCreateServerSettings)
 
 $btnCreateServerSettings.Add_Click({ Invoke-CreateServerSettings })
