@@ -75,7 +75,7 @@ logs/                      Per-server action logs (logs/<Key>/<Action>.log)
   "GlobalSettings": {
     "Process": { "Name": "ArkAscendedServer", "Path": "ShooterGame\\Binaries\\Win64", "RestartTime": 300, "RestartEnabled": true },
     "Ini":     { "Path": "ShooterGame\\Saved\\Config\\WindowsServer", "File": "GameUserSettings.ini" },
-    "Startup": { "Name": "ArkAscendedServer", "Path": "ShooterGame\\Saved\\Config\\WindowsServer", "File": "RunServer.cmd", "Delay": 5 },
+    "Startup": { "Name": "ArkAscendedServer", "File": "RunServer.cmd", "Delay": 5 },
     "Backup":  { "Path": "C:\\Backup\\ArkAsaNew", "DailyToKeep": 7, "WeeklyToKeep": 4 },
     "Shutdown": { "Time": 900, "ExitDelay": 5, "Messages": { "900": "...", "0": "..." } }
   },

@@ -39,6 +39,8 @@ $runFileCount = 0
 $iniFileTypes = @("GameUserSettings", "Game")
 $mergeStrategies = @("Append", "Override")
 
+$startupFile = $config.GlobalSettings.Startup.File
+
 foreach ($entry in $config.Entries) {
     if ([string]::IsNullOrWhiteSpace($entry.Key)) {
         Write-Warning 'Skipping an entry with a missing Key.'
@@ -80,13 +82,13 @@ foreach ($entry in $config.Entries) {
     $entryRunJsonPath = Join-Path $appendRoot (Join-Path $entry.Key 'run.json')
     #$entryRunJsonPath = [System.IO.Path]::Combine($appendRoot, $entry.Key, 'run.json')
     if (-not (Test-Path -LiteralPath $entryRunJsonPath -PathType Leaf)) {
-        Write-ActionLog -LogPath $logPath -Message "[$($entry.Key)] Skipping RunServer.cmd: run configuration not found at '$entryRunJsonPath'."
+        Write-ActionLog -LogPath $logPath -Message "[$($entry.Key)] Skipping $($startupFile): run configuration not found at '$entryRunJsonPath'."
         continue
     }
 
     $entryRunConfig = Get-Content -LiteralPath $entryRunJsonPath -Raw -ErrorAction Stop | ConvertFrom-Json
     if ([string]::IsNullOrWhiteSpace($entryRunConfig.map)) {
-        Write-ActionLog -LogPath $logPath -Message "[$($entry.Key)] Skipping RunServer.cmd: the map property is required."
+        Write-ActionLog -LogPath $logPath -Message "[$($entry.Key)] Skipping $($startupFile): the map property is required."
         continue
     }
 
@@ -100,7 +102,9 @@ foreach ($entry in $config.Entries) {
     $mods = @($baseRunConfig.mods) + @($entryRunConfig.mods) | Where-Object {
         -not [string]::IsNullOrWhiteSpace([string]$_)
     } | Select-Object -Unique
-    $serverExecutable = Join-Path $entry.ServerPath (Join-Path $config.GlobalSettings.Process.Path "$($config.GlobalSettings.Startup.Name).exe")
+
+    $startupExe = $config.GlobalSettings.Startup.Name -replace '\.exe$', ''
+    $serverExecutable = Join-Path $entry.ServerPath (Join-Path $config.GlobalSettings.Process.Path "$($startupExe).exe")
     #$serverExecutable = [System.IO.Path]::Combine($entry.ServerPath, $config.GlobalSettings.Process.Path, "$($config.GlobalSettings.Startup.Name).exe")
     $serverUrl = $entryRunConfig.map + '?' + ($urlOptions -join '?')
     $arguments = @($commandLineOptions)
@@ -108,7 +112,7 @@ foreach ($entry in $config.Entries) {
         $arguments += "-mods=$($mods -join ',')"
     }
     $command = "start `"#$($entry.Key)`" $($startOptions -join ' ') `"$serverExecutable`" $serverUrl $($arguments -join ' ')".Trim() -replace ' {2,}', ' '
-    $runServerPath = Join-Path $actionsRoot (Join-Path 'config\maps' (Join-Path $entry.Key (Join-Path 'config' $config.GlobalSettings.Startup.File)))
+    $runServerPath = Join-Path $actionsRoot (Join-Path 'config\maps' (Join-Path $entry.Key (Join-Path 'config' $startupFile)))
     #$runServerPath = [System.IO.Path]::Combine($actionsRoot, 'config', 'maps', $entry.Key, 'config', $config.GlobalSettings.Startup.File)
 
     $runFileCount++
@@ -120,5 +124,5 @@ foreach ($entry in $config.Entries) {
     }
 }
 
-Write-ActionLog -LogPath $logPath -Message "INI sync complete: $processedCount merged, $copyCount copied, $skippedCount skipped; $runFileCount RunServer.cmd file(s) generated."
+Write-ActionLog -LogPath $logPath -Message "INI sync complete: $processedCount merged, $copyCount copied, $skippedCount skipped; $runFileCount $startupFile file(s) generated."
 Start-Sleep -Seconds 10

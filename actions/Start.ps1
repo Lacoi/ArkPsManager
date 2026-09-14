@@ -44,7 +44,6 @@ try {
     Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message "Waiting 5 seconds before starting the server to avoid file locks..."
     Start-Sleep -Seconds 5
 
-    #$runscriptPath = Join-Path (Join-Path $ctx.ServerPath $ctx.GlobalSettings.Startup.Path) "$($ctx.GlobalSettings.Startup.File)"
     $runscriptPath = Join-Path (Join-Path $ctx.ConfigPath "config") "$($ctx.GlobalSettings.Startup.File)"
     if (-not (Test-Path $runscriptPath -PathType Leaf)) {
         Write-ActionMessage -Ctx $ctx -ActionName "Start" -Message "Executable not found: $runscriptPath"

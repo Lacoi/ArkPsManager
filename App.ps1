@@ -43,7 +43,6 @@ function Get-DefaultConfig {
                 File = "GameUserSettings.ini"
             }
             Startup = [PSCustomObject]@{
-                Path  = "ShooterGame\Saved\Config\WindowsServer"
                 File  = "RunServer.cmd"
                 Delay = 5
             }
@@ -1037,7 +1036,6 @@ function Update-Grid {
     # Auto-restart any entry that has been stopped longer than GlobalSettings.Process.RestartTime
     $restartEnabled = [bool]$script:config.GlobalSettings.Process.RestartEnabled
     $restartTimeSeconds = [int]($script:config.GlobalSettings.Process.RestartTime)
-    $startupPath = $script:config.GlobalSettings.Startup.Path
     $startupFile = $script:config.GlobalSettings.Startup.File
     foreach ($entry in $script:config.Entries) {
         if ([string]::IsNullOrWhiteSpace($entry.ServerPath)) { continue }
@@ -1051,7 +1049,7 @@ function Update-Grid {
         if (-not $restartEnabled -or $restartTimeSeconds -le 0) { continue }
 
         # Check if the expected startup script exists before attempting to auto-restart
-        if (-not (Test-Path (Join-Path (Join-Path $entry.ServerPath $startupPath) "$startupFile") -PathType Leaf)) { continue }
+        if (-not (Test-Path (Join-Path (Join-Path $ctx.ConfigPath "config") $startupFile) -PathType Leaf)) { continue }
 
         if (-not $entry.StoppedSince) {
             $entry.StoppedSince = Get-Date
