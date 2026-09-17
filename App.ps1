@@ -444,25 +444,56 @@ function Invoke-EntryBackup  { param([string]$Key) Invoke-EntryAction -ScriptNam
 function Invoke-EntryUpdate  { param([string]$Key) Invoke-EntryAction -ScriptName "Update"  -Key $Key }
 
 # ---------------------------
-# Bulk action functions (apply the same action to ALL currently selected rows)
+# Bulk action functions (apply the same action to ALL currently selected rows, via RunAction.ps1)
 # ---------------------------
 function Invoke-BulkAction {
-    param([string]$ScriptName)
+    param([string]$ScriptName, [string[]]$Keys, [string]$Mode)
 
-    if ($grid.SelectedRows.Count -eq 0) {
+    if (-not $Keys -or $Keys.Count -eq 0) {
+        $Keys = @($grid.SelectedRows | ForEach-Object { $_.Cells["KeyCol"].Value })
+    }
+    if ($Keys.Count -eq 0) {
         [System.Windows.Forms.MessageBox]::Show("Select at least one entry first.", "Info") | Out-Null
         return
     }
 
-    $keys = @($grid.SelectedRows | ForEach-Object { $_.Cells["KeyCol"].Value })
-    foreach ($k in $keys) {
-        Invoke-EntryAction -ScriptName $ScriptName -Key $k
+    # "Default" keeps the caller-supplied $Mode (each Invoke-Bulk* passes its own sensible default)
+    if (-not $radBulkModeDefault.Checked) {
+        $Mode = if ($radBulkModeSequential.Checked) { "Sequential" } else { "Parallel" }
+    }
+
+    $scriptPath = Join-Path $script:actionsFolder "RunAction.ps1"
+    $check = Test-ActionScript -ScriptPath $scriptPath
+    if (-not $check.IsValid) {
+        [System.Windows.Forms.MessageBox]::Show(
+            $check.Reason,
+            "Action Script Unavailable",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $argList = @(
+        #"-NoExit" # Uncomment for debugging the action script in a new PowerShell window
+        "-ExecutionPolicy", "Bypass"
+        "-File", "`"$scriptPath`""
+        "-ActionName", "$ScriptName"
+        "-Mode", "$Mode"
+        "-ConfigJsonPath", "`"$configPath`""
+        "-Keys"
+    ) + $Keys
+
+    try {
+        Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Normal
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error launching 'RunAction.ps1' for '$ScriptName':`n$_", "Script Error") | Out-Null
     }
 }
 
-function Invoke-BulkStart   { Invoke-BulkAction -ScriptName "Start" }
-function Invoke-BulkRestart { Invoke-BulkAction -ScriptName "Restart" }
-function Invoke-BulkStop    { Invoke-BulkAction -ScriptName "Stop" }
+function Invoke-BulkStart   { Invoke-BulkAction -ScriptName "Start"   -Mode "Sequential" }
+function Invoke-BulkRestart { Invoke-BulkAction -ScriptName "Restart" -Mode "Sequential" }
+function Invoke-BulkStop    { Invoke-BulkAction -ScriptName "Stop"    -Mode "Parallel" }
 function Invoke-BulkKill    {
     if ($grid.SelectedRows.Count -eq 0) {
         [System.Windows.Forms.MessageBox]::Show("Select at least one entry first.", "Info") | Out-Null
@@ -477,12 +508,10 @@ function Invoke-BulkKill    {
     if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
 
     $keys = @($grid.SelectedRows | ForEach-Object { $_.Cells["KeyCol"].Value })
-    foreach ($k in $keys) {
-        Invoke-EntryAction -ScriptName "Kill" -Key $k
-    }
+    Invoke-BulkAction -ScriptName "Kill" -Keys $keys -Mode "Parallel"
 }
-function Invoke-BulkBackup  { Invoke-BulkAction -ScriptName "Backup" }
-function Invoke-BulkUpdate  { Invoke-BulkAction -ScriptName "Update" }
+function Invoke-BulkBackup  { Invoke-BulkAction -ScriptName "Backup" -Mode "Parallel" }
+function Invoke-BulkUpdate  { Invoke-BulkAction -ScriptName "Update" -Mode "Sequential" }
 
 # ---------------------------
 # UpdateCache action (standalone, no arguments passed at all)
@@ -613,7 +642,7 @@ function Invoke-PinPreviousBuild {
 # ---------------------------
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Server Config Manager"
-$form.Size = New-Object System.Drawing.Size(900, 760)
+$form.Size = New-Object System.Drawing.Size(900, 790)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
@@ -852,42 +881,61 @@ function New-ActionButtonColumn($name, $text, $width) {
 $grpBulk = New-Object System.Windows.Forms.GroupBox
 $grpBulk.Text = "Bulk Actions (selected entries)"
 $grpBulk.Location = New-Object System.Drawing.Point(15, 600)
-$grpBulk.Size = New-Object System.Drawing.Size(500, 60)
+$grpBulk.Size = New-Object System.Drawing.Size(500, 90)
 $form.Controls.Add($grpBulk)
+
+$radBulkModeDefault = New-Object System.Windows.Forms.RadioButton
+$radBulkModeDefault.Text = "Default"
+$radBulkModeDefault.Location = New-Object System.Drawing.Point(10, 20)
+$radBulkModeDefault.Size = New-Object System.Drawing.Size(80, 20)
+$radBulkModeDefault.Checked = $true
+$grpBulk.Controls.Add($radBulkModeDefault)
+
+$radBulkModeParallel = New-Object System.Windows.Forms.RadioButton
+$radBulkModeParallel.Text = "Parallel"
+$radBulkModeParallel.Location = New-Object System.Drawing.Point(100, 20)
+$radBulkModeParallel.Size = New-Object System.Drawing.Size(80, 20)
+$grpBulk.Controls.Add($radBulkModeParallel)
+
+$radBulkModeSequential = New-Object System.Windows.Forms.RadioButton
+$radBulkModeSequential.Text = "Sequential"
+$radBulkModeSequential.Location = New-Object System.Drawing.Point(190, 20)
+$radBulkModeSequential.Size = New-Object System.Drawing.Size(90, 20)
+$grpBulk.Controls.Add($radBulkModeSequential)
 
 $btnBulkStart = New-Object System.Windows.Forms.Button
 $btnBulkStart.Text = "Start"
-$btnBulkStart.Location = New-Object System.Drawing.Point(10, 22)
+$btnBulkStart.Location = New-Object System.Drawing.Point(10, 48)
 $btnBulkStart.Size = New-Object System.Drawing.Size(75, 28)
 $grpBulk.Controls.Add($btnBulkStart)
 
 $btnBulkRestart = New-Object System.Windows.Forms.Button
 $btnBulkRestart.Text = "Restart"
-$btnBulkRestart.Location = New-Object System.Drawing.Point(90, 22)
+$btnBulkRestart.Location = New-Object System.Drawing.Point(90, 48)
 $btnBulkRestart.Size = New-Object System.Drawing.Size(75, 28)
 $grpBulk.Controls.Add($btnBulkRestart)
 
 $btnBulkStop = New-Object System.Windows.Forms.Button
 $btnBulkStop.Text = "Stop"
-$btnBulkStop.Location = New-Object System.Drawing.Point(170, 22)
+$btnBulkStop.Location = New-Object System.Drawing.Point(170, 48)
 $btnBulkStop.Size = New-Object System.Drawing.Size(75, 28)
 $grpBulk.Controls.Add($btnBulkStop)
 
 $btnBulkKill = New-Object System.Windows.Forms.Button
 $btnBulkKill.Text = "Kill"
-$btnBulkKill.Location = New-Object System.Drawing.Point(250, 22)
+$btnBulkKill.Location = New-Object System.Drawing.Point(250, 48)
 $btnBulkKill.Size = New-Object System.Drawing.Size(75, 28)
 $grpBulk.Controls.Add($btnBulkKill)
 
 $btnBulkBackup = New-Object System.Windows.Forms.Button
 $btnBulkBackup.Text = "Backup"
-$btnBulkBackup.Location = New-Object System.Drawing.Point(330, 22)
+$btnBulkBackup.Location = New-Object System.Drawing.Point(330, 48)
 $btnBulkBackup.Size = New-Object System.Drawing.Size(75, 28)
 $grpBulk.Controls.Add($btnBulkBackup)
 
 $btnBulkUpdate = New-Object System.Windows.Forms.Button
 $btnBulkUpdate.Text = "Update"
-$btnBulkUpdate.Location = New-Object System.Drawing.Point(410, 22)
+$btnBulkUpdate.Location = New-Object System.Drawing.Point(410, 48)
 $btnBulkUpdate.Size = New-Object System.Drawing.Size(75, 28)
 $grpBulk.Controls.Add($btnBulkUpdate)
 
@@ -901,7 +949,7 @@ $btnBulkUpdate.Add_Click({ Invoke-BulkUpdate })
 # ---- UpdateCache button (standalone action, no entry context) ----
 $btnUpdateCache = New-Object System.Windows.Forms.Button
 $btnUpdateCache.Text = "UpdateCache"
-$btnUpdateCache.Location = New-Object System.Drawing.Point(15, 680)
+$btnUpdateCache.Location = New-Object System.Drawing.Point(15, 710)
 $btnUpdateCache.Size = New-Object System.Drawing.Size(120, 28)
 $form.Controls.Add($btnUpdateCache)
 
@@ -910,7 +958,7 @@ $btnUpdateCache.Add_Click({ Invoke-UpdateCache })
 # ---- Pin Previous Build button (standalone action, no entry context) ----
 $btnPinPreviousBuild = New-Object System.Windows.Forms.Button
 $btnPinPreviousBuild.Text = "Pin Previous Build"
-$btnPinPreviousBuild.Location = New-Object System.Drawing.Point(145, 680)
+$btnPinPreviousBuild.Location = New-Object System.Drawing.Point(145, 710)
 $btnPinPreviousBuild.Size = New-Object System.Drawing.Size(150, 28)
 $form.Controls.Add($btnPinPreviousBuild)
 
@@ -919,7 +967,7 @@ $btnPinPreviousBuild.Add_Click({ Invoke-PinPreviousBuild })
 # ---- Auto-restart toggle (reflects/persists GlobalSettings.Process.RestartEnabled) ----
 $chkRestartEnabled = New-Object System.Windows.Forms.CheckBox
 $chkRestartEnabled.Text = "Auto-restart stopped servers"
-$chkRestartEnabled.Location = New-Object System.Drawing.Point(305, 685)
+$chkRestartEnabled.Location = New-Object System.Drawing.Point(305, 715)
 $chkRestartEnabled.Size = New-Object System.Drawing.Size(200, 20)
 $chkRestartEnabled.Checked = [bool]$script:config.GlobalSettings.Process.RestartEnabled
 $form.Controls.Add($chkRestartEnabled)
@@ -927,7 +975,7 @@ $form.Controls.Add($chkRestartEnabled)
 # ---- EditServerSettings button (standalone action, no entry context) ----
 $btnEditServerSettings = New-Object System.Windows.Forms.Button
 $btnEditServerSettings.Text = "Edit Server Settings"
-$btnEditServerSettings.Location = New-Object System.Drawing.Point(550, 680)
+$btnEditServerSettings.Location = New-Object System.Drawing.Point(550, 710)
 $btnEditServerSettings.Size = New-Object System.Drawing.Size(150, 28)
 $form.Controls.Add($btnEditServerSettings)
 
@@ -936,7 +984,7 @@ $btnEditServerSettings.Add_Click({ Invoke-EditServerSettings })
 # ---- CreateServerSettings button (standalone action, no entry context) ----
 $btnCreateServerSettings = New-Object System.Windows.Forms.Button
 $btnCreateServerSettings.Text = "Generate Server Settings"
-$btnCreateServerSettings.Location = New-Object System.Drawing.Point(710, 680)
+$btnCreateServerSettings.Location = New-Object System.Drawing.Point(710, 710)
 $btnCreateServerSettings.Size = New-Object System.Drawing.Size(160, 28)
 $form.Controls.Add($btnCreateServerSettings)
 

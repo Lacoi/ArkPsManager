@@ -7,6 +7,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 ## Features
 
 - **Multi-server dashboard** ([App.ps1](App.ps1)) - add any number of server entries (map/instance), see live PID, session name, RAM usage and start time, and act on one or many selected entries at once. `ServerPath` is validated to be on a local fixed drive (not a UNC path or mapped network share) before an entry is saved.
+- **Multi-key action proxy** ([actions/RunAction.ps1](actions/RunAction.ps1)) - runs any per-key action (`Start`/`Stop`/`Restart`/`Kill`/`Backup`/`Update`) for a list of `Keys` either `Sequential` or `Parallel`; the bulk-action buttons in the dashboard use this (in `Parallel` mode) instead of launching one window per entry. `Start` actions are staggered by `GlobalSettings.Startup.Delay` seconds between keys so servers don't all start at once.
 - **Shared local cache** ([actions/UpdateCache.ps1](actions/UpdateCache.ps1)) - installs SteamCMD on first run and keeps a single cached copy of the ARK server files (app `2430930`), so every server instance updates from disk instead of re-downloading from Steam.
   - Detects the SteamCMD build id from `appmanifest_2430930.acf` and snapshots the cache into a versioned `Cache\Server_<buildid>` folder, automatically pruning old snapshots down to the latest 3 - any build with a matching `<buildid>.build` marker is never pruned, no matter how old.
   - Downloads the latest [AsaApi](https://github.com/ArkServerApi/AsaApi) release from GitHub, but only when the tagged version differs from the cached one (checked via a local `version.txt`).
@@ -35,7 +36,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 4. Click **Add Entry**, give it a `Key` (used as the folder name under `config/maps/<Key>`) and the target `ServerPath` for that instance, then **Add Entry**.
 5. Click **UpdateCache** to install SteamCMD and download the ARK server files into the shared cache.
 6. Click **Generate Server Settings** to merge each entry's INI/`run.json` sources from `config/ini` into `config/maps/<Key>/config/*.ini` and `RunServer.cmd` (use **Edit Server Settings** first if you need to edit those source files).
-7. Use the per-row **Start** / **Restart** / **Stop** / **Kill** / **Backup** / **Update** buttons (or the bulk-action buttons for multiple selected rows) to manage servers.
+7. Use the per-row **Start** / **Restart** / **Stop** / **Kill** / **Backup** / **Update** buttons (or the bulk-action buttons for multiple selected rows, which run via [actions/RunAction.ps1](actions/RunAction.ps1)) to manage servers.
 8. If an update causes problems, click **Pin Previous Build** to roll `Update` back to the previous cached build (see [Build Pinning](#build-pinning)).
 
 ## Project Structure
@@ -52,6 +53,7 @@ actions/
   Start.ps1 / Stop.ps1 / Restart.ps1 / Kill.ps1
   Backup.ps1               Zips server config + save files
   CreateServerSettings.ps1  Generates per-map INI files + RunServer.cmd from config/ini
+  RunAction.ps1             Proxy that runs an action for multiple Keys, Sequential or Parallel
   Update.ps1               Syncs server files/AsaApi/plugins from the shared cache
   UpdateCache.ps1          Installs SteamCMD, updates the shared server cache, downloads AsaApi
   ArkRcon/                 Minimal ARK RCON client module
@@ -119,9 +121,23 @@ After each **Backup**, `Invoke-BackupRetention` ([actions/ServerBackup](actions/
 
 Backups are matched by the `..._yyyyMMdd_HHmmss.zip` naming `Backup-ArkServer` already uses, so files that don't match this pattern are left untouched.
 
+## Running an Action for Multiple Servers
+
+[actions/RunAction.ps1](actions/RunAction.ps1) is a proxy that runs one of `Start`/`Stop`/`Restart`/`Kill`/`Backup`/`Update` for a list of `-Keys`, instead of one entry at a time:
+
+```powershell
+# Runs one after another, waiting for each to finish before starting the next
+pwsh -File actions/RunAction.ps1 -ActionName Backup -Keys TheIsland,TheCenter -Mode Sequential
+
+# Launches all of them at once and waits for all to finish
+pwsh -File actions/RunAction.ps1 -ActionName Update -Keys TheIsland,TheCenter -Mode Parallel
+```
+
+`-Mode` defaults to `Sequential`. For `-ActionName Start`, both modes pause `GlobalSettings.Startup.Delay` seconds between each key (between finishing one and starting the next in `Sequential`, or between launching each in `Parallel`), so multiple servers don't start at the exact same time. Exits non-zero and lists the failed keys if any key's action returns a non-zero exit code - useful for a single Task Scheduler entry that acts on every server instead of one task per key. The dashboard's bulk-action buttons use this script in `Parallel` mode.
+
 ## Scheduling Actions with Task Scheduler
 
-Every script under `actions/` is a standalone entry point, so any action (`Start`, `Stop`, `Restart`, `Kill`, `Backup`, `Update`) can be scheduled to run unattended, without the GUI open. `UpdateCache.ps1` and `CreateServerSettings.ps1` take no parameters; the rest require `-Key` (the server's entry key). `-ConfigJsonPath` is optional and defaults to `config.json` next to the `actions` folder, so it only needs to be passed if `config.json` lives somewhere else.
+Every script under `actions/` is a standalone entry point, so any action (`Start`, `Stop`, `Restart`, `Kill`, `Backup`, `Update`) can be scheduled to run unattended, without the GUI open. `UpdateCache.ps1` and `CreateServerSettings.ps1` take no parameters; the rest require `-Key` (the server's entry key), or use [actions/RunAction.ps1](actions/RunAction.ps1) with `-Keys` to act on several servers from one scheduled task. `-ConfigJsonPath` is optional and defaults to `config.json` next to the `actions` folder, so it only needs to be passed if `config.json` lives somewhere else.
 
 ### Using the Task Scheduler GUI
 
