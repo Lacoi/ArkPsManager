@@ -110,7 +110,7 @@ function Read-Config {
 
 function Save-Config {
     # Only persist Entries (Key/ServerPath). GlobalSettings is intentionally NOT
-    # written here - it is only ever saved via the Settings dialog (Settings.ps1),
+    # written here - it is only ever saved via the Settings dialog (settings\Global.ps1),
     # so App.ps1 never overwrites GlobalSettings in config.json.
     $entriesToSave = $script:config.Entries | ForEach-Object {
         [PSCustomObject]@{
@@ -166,9 +166,9 @@ function Set-RestartEnabled {
 }
 
 # ---------------------------
-# Settings dialog (Settings.ps1) - loaded defensively
+# Settings dialogs (settings\Global.ps1, settings\Server.ps1) - loaded defensively
 # ---------------------------
-$settingsScriptPath = Join-Path $PSScriptRoot "Settings.ps1"
+$settingsScriptPath = Join-Path $PSScriptRoot "settings\Global.ps1"
 $script:settingsAvailable = $false
 
 if (Test-Path $settingsScriptPath) {
@@ -178,13 +178,32 @@ if (Test-Path $settingsScriptPath) {
         if (Get-Command -Name Show-SettingsDialog -ErrorAction SilentlyContinue) {
             $script:settingsAvailable = $true
         } else {
-            Write-Warning "Settings.ps1 was loaded but does not define 'Show-SettingsDialog'."
+            Write-Warning "settings\Global.ps1 was loaded but does not define 'Show-SettingsDialog'."
         }
     } catch {
-        Write-Warning "Failed to load Settings.ps1: $_"
+        Write-Warning "Failed to load settings\Global.ps1: $_"
     }
 } else {
-    Write-Warning "Settings.ps1 not found at: $settingsScriptPath"
+    Write-Warning "settings\Global.ps1 not found at: $settingsScriptPath"
+}
+
+$serverSettingsScriptPath = Join-Path $PSScriptRoot "settings\Server.ps1"
+$script:serverSettingsAvailable = $false
+
+if (Test-Path $serverSettingsScriptPath) {
+    try {
+        . $serverSettingsScriptPath
+
+        if (Get-Command -Name Show-ServerSettingsDialog -ErrorAction SilentlyContinue) {
+            $script:serverSettingsAvailable = $true
+        } else {
+            Write-Warning "settings\Server.ps1 was loaded but does not define 'Show-ServerSettingsDialog'."
+        }
+    } catch {
+        Write-Warning "Failed to load settings\Server.ps1: $_"
+    }
+} else {
+    Write-Warning "settings\Server.ps1 not found at: $serverSettingsScriptPath"
 }
 
 # ---------------------------
@@ -574,31 +593,23 @@ function Invoke-CreateServerSettings {
 }
 
 # ---------------------------
-# EditServerSettings action (standalone, launches the ServerSettings.ps1 ini editor GUI)
+# EditServerSettings action (standalone, opens the settings\Server.ps1 ini editor GUI in-process)
 # ---------------------------
 function Invoke-EditServerSettings {
-    $scriptPath = Join-Path $PSScriptRoot "ServerSettings.ps1"
-
-    $check = Test-ActionScript -ScriptPath $scriptPath
-    if (-not $check.IsValid) {
+    if (-not $script:serverSettingsAvailable) {
         [System.Windows.Forms.MessageBox]::Show(
-            $check.Reason,
-            "Action Script Unavailable",
+            "settings\Server.ps1 could not be found or loaded.`nExpected at:`n$serverSettingsScriptPath`n`nServer settings cannot be edited until this file is available.",
+            "Server Settings Unavailable",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Warning
         ) | Out-Null
         return
     }
 
-    $argList = @(
-        "-ExecutionPolicy", "Bypass"
-        "-File", "`"$scriptPath`""
-    )
-
     try {
-        Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Normal
+        Show-ServerSettingsDialog -ConfigJsonPath $configPath
     } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error launching 'ServerSettings.ps1':`n$_", "Script Error") | Out-Null
+        [System.Windows.Forms.MessageBox]::Show("An error occurred while opening the Server Settings dialog:`n$_", "Server Settings Error") | Out-Null
     }
 }
 
@@ -662,7 +673,7 @@ if (-not $script:settingsAvailable) {
 $btnSettings.Add_Click({
     if (-not $script:settingsAvailable) {
         [System.Windows.Forms.MessageBox]::Show(
-            "Settings.ps1 could not be found or loaded.`nExpected at:`n$settingsScriptPath`n`nGlobal settings cannot be edited until this file is available.",
+            "settings\Global.ps1 could not be found or loaded.`nExpected at:`n$settingsScriptPath`n`nGlobal settings cannot be edited until this file is available.",
             "Settings Unavailable",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Warning
@@ -978,6 +989,11 @@ $btnEditServerSettings.Text = "Edit Server Settings"
 $btnEditServerSettings.Location = New-Object System.Drawing.Point(550, 710)
 $btnEditServerSettings.Size = New-Object System.Drawing.Size(150, 28)
 $form.Controls.Add($btnEditServerSettings)
+
+if (-not $script:serverSettingsAvailable) {
+    $btnEditServerSettings.Enabled = $false
+    $btnEditServerSettings.Text = "Edit Server Settings (unavailable)"
+}
 
 $btnEditServerSettings.Add_Click({ Invoke-EditServerSettings })
 

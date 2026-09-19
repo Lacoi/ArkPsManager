@@ -2,9 +2,9 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 # ---------------------------
-# Settings.ps1
+# global.ps1
 # Standalone module for editing GlobalSettings.
-# Dot-sourced by App.ps1: . (Join-Path $PSScriptRoot "Settings.ps1")
+# Dot-sourced by App.ps1: . (Join-Path $PSScriptRoot "settings\global.ps1")
 # Exposes Show-SettingsDialog -ConfigJsonPath <path>
 # The dialog reads/writes GlobalSettings directly in config.json,
 # leaving Entries untouched.
