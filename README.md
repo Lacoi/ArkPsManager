@@ -17,6 +17,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 - **Generated launch scripts** - per-map `run.json` (start options, URL options, command-line options, mods) is merged with a shared base `run.json` to generate each server's `RunServer.cmd`.
 - **Server Settings editor** ([settings/server.ps1](settings/server.ps1)) - a WinForms GUI (opened in-process via **Edit Server Settings**) for editing the raw `config/ini` source files directly: the shared `(Global)` `Base_Game.ini` / `Base_GameUserSettings.ini` / `run.json`, or any per-map `Game_Append.ini` / `Game_Override.ini` / `GameUserSettings_Append.ini` / `GameUserSettings_Override.ini` / `run.json` under `config/ini/<Key>/`. Saving skips/deletes files left empty instead of writing blank files, so untouched overrides aren't created.
 - **Graceful shutdown** ([actions/Stop.ps1](actions/Stop.ps1), [actions/ArkRcon](actions/ArkRcon)) - broadcasts countdown warnings over RCON, ends early once no players are connected, saves the world, then shuts the server down.
+- **Ad-hoc RCON commands** ([actions/Rcon.ps1](actions/Rcon.ps1)) - the per-row **Rcon** button opens a non-blocking prompt to send any RCON command (e.g. `broadcast`, `listplayers`, `saveworld`) to a running server; the response is written to `logs/<Key>/Rcon.log`.
 - **Zipped backups** ([actions/Backup.ps1](actions/Backup.ps1), [actions/ServerBackup](actions/ServerBackup)) - archives server config and save-game files (`.arkprofile`, `.arktribe`, etc.) to a timestamped zip, then prunes old backups using a daily + weekly retention policy (see [Backup Retention](#backup-retention)). Fails fast if `GlobalSettings.Backup.Path` doesn't exist (e.g. an external backup drive isn't connected).
 - **Auto-restart** - optionally restarts a server automatically if it has been stopped for longer than a configurable time.
 - **Memory priority normalization** - when `GlobalSettings.Process.SetMemoryPrio` is enabled (default), any matched server process found running at a reduced memory priority is reset to Normal on every process-match refresh.
@@ -37,7 +38,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 4. Click **Add Entry**, give it a `Key` (used as the folder name under `config/maps/<Key>`) and the target `ServerPath` for that instance, then **Add Entry**.
 5. Click **UpdateCache** to install SteamCMD and download the ARK server files into the shared cache.
 6. Click **Generate Server Settings** to merge each entry's INI/`run.json` sources from `config/ini` into `config/maps/<Key>/config/*.ini` and `RunServer.cmd` (use **Edit Server Settings** first if you need to edit those source files).
-7. Use the per-row **Start** / **Restart** / **Stop** / **Kill** / **Backup** / **Update** buttons (or the bulk-action buttons for multiple selected rows, which run via [actions/RunAction.ps1](actions/RunAction.ps1)) to manage servers.
+7. Use the per-row **Start** / **Restart** / **Stop** / **Kill** / **Backup** / **Update** / **Rcon** buttons (or the bulk-action buttons for multiple selected rows, which run via [actions/RunAction.ps1](actions/RunAction.ps1)) to manage servers.
 8. If an update causes problems, click **Pin Previous Build** to roll `Update` back to the previous cached build (see [Build Pinning](#build-pinning)).
 
 ## Project Structure
@@ -56,6 +57,7 @@ actions/
   Backup.ps1               Zips server config + save files
   CreateServerSettings.ps1  Generates per-map INI files + RunServer.cmd from config/ini
   RunAction.ps1             Proxy that runs an action for multiple Keys, Sequential or Parallel
+  Rcon.ps1                 Sends a single RCON command to a running server
   Update.ps1               Syncs server files/AsaApi/plugins from the shared cache
   UpdateCache.ps1          Installs SteamCMD, updates the shared server cache, downloads AsaApi
   ArkRcon/                 Minimal ARK RCON client module

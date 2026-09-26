@@ -504,6 +504,91 @@ function Invoke-EntryBackup  { param([string]$Key) Invoke-EntryAction -ScriptNam
 function Invoke-EntryUpdate  { param([string]$Key) Invoke-EntryAction -ScriptName "Update"  -Key $Key }
 
 # ---------------------------
+# Rcon action (prompts for a command via a non-blocking modeless window, then runs actions/Rcon.ps1)
+# ---------------------------
+function Invoke-RconCommand {
+    param([string]$Key, [string]$Command)
+
+    if ([string]::IsNullOrWhiteSpace($Command)) { return }
+
+    $scriptPath = Join-Path $script:actionsFolder "Rcon.ps1"
+    $check = Test-ActionScript -ScriptPath $scriptPath
+    if (-not $check.IsValid) {
+        [System.Windows.Forms.MessageBox]::Show(
+            $check.Reason,
+            "Action Script Unavailable",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $argList = @(
+        #"-NoExit" # Uncomment for debugging the action script in a new PowerShell window
+        "-ExecutionPolicy", "Bypass"
+        "-File", "`"$scriptPath`""
+        "-Key", "`"$Key`""
+        "-Command", "`"$Command`""
+        "-ConfigJsonPath", "`"$configPath`""
+    )
+
+    try {
+        Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Normal
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error launching 'Rcon.ps1' for '$Key':`n$_", "Script Error") | Out-Null
+    }
+}
+
+function Invoke-EntryRcon {
+    param([string]$Key)
+
+    # Modeless (.Show, not .ShowDialog) so the prompt doesn't block the main form/timer
+    $prompt = New-Object System.Windows.Forms.Form
+    $prompt.Text = "Send RCON Command - $Key"
+    $prompt.Size = New-Object System.Drawing.Size(420, 150)
+    $prompt.StartPosition = "CenterScreen"
+    $prompt.FormBorderStyle = "FixedDialog"
+    $prompt.MaximizeBox = $false
+    $prompt.MinimizeBox = $false
+    $prompt.TopMost = $true
+
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = "RCON command:"
+    $lbl.Location = New-Object System.Drawing.Point(15, 15)
+    $lbl.Size = New-Object System.Drawing.Size(380, 20)
+    $prompt.Controls.Add($lbl)
+
+    $txtCommand = New-Object System.Windows.Forms.TextBox
+    $txtCommand.Location = New-Object System.Drawing.Point(15, 40)
+    $txtCommand.Size = New-Object System.Drawing.Size(380, 24)
+    $prompt.Controls.Add($txtCommand)
+
+    $btnSend = New-Object System.Windows.Forms.Button
+    $btnSend.Text = "Send"
+    $btnSend.Location = New-Object System.Drawing.Point(235, 75)
+    $btnSend.Size = New-Object System.Drawing.Size(80, 28)
+    $prompt.Controls.Add($btnSend)
+
+    $btnCancel = New-Object System.Windows.Forms.Button
+    $btnCancel.Text = "Cancel"
+    $btnCancel.Location = New-Object System.Drawing.Point(315, 75)
+    $btnCancel.Size = New-Object System.Drawing.Size(80, 28)
+    $prompt.Controls.Add($btnCancel)
+
+    $prompt.AcceptButton = $btnSend
+    $prompt.CancelButton = $btnCancel
+
+    $btnSend.Add_Click({
+        Invoke-RconCommand -Key $Key -Command $txtCommand.Text.Trim()
+        $prompt.Close()
+    }.GetNewClosure())
+    $btnCancel.Add_Click({ $prompt.Close() }.GetNewClosure())
+
+    $prompt.Show()
+    $txtCommand.Focus()
+}
+
+# ---------------------------
 # Bulk action functions (apply the same action to ALL currently selected rows, via RunAction.ps1)
 # ---------------------------
 function Invoke-BulkAction {
@@ -694,7 +779,7 @@ function Invoke-PinPreviousBuild {
 # ---------------------------
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Server Config Manager"
-$form.Size = New-Object System.Drawing.Size(900, 790)
+$form.Size = New-Object System.Drawing.Size(960, 790)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
@@ -769,7 +854,7 @@ $btnReloadSettings.Add_Click({
 $grpEntry = New-Object System.Windows.Forms.GroupBox
 $grpEntry.Text = "Add / Edit Entry"
 $grpEntry.Location = New-Object System.Drawing.Point(15, 60)
-$grpEntry.Size = New-Object System.Drawing.Size(855, 100)
+$grpEntry.Size = New-Object System.Drawing.Size(915, 100)
 $form.Controls.Add($grpEntry)
 
 $lblKey = New-Object System.Windows.Forms.Label
@@ -839,14 +924,14 @@ $form.Controls.Add($btnClear)
 
 $btnRefreshProc = New-Object System.Windows.Forms.Button
 $btnRefreshProc.Text = "Refresh Processes"
-$btnRefreshProc.Location = New-Object System.Drawing.Point(745, 170)
+$btnRefreshProc.Location = New-Object System.Drawing.Point(805, 170)
 $btnRefreshProc.Size = New-Object System.Drawing.Size(125, 28)
 $form.Controls.Add($btnRefreshProc)
 
 # ---- System RAM usage bar (above the grid) ----
 $progressRam = New-Object System.Windows.Forms.ProgressBar
 $progressRam.Location = New-Object System.Drawing.Point(15, 208)
-$progressRam.Size = New-Object System.Drawing.Size(855, 16)
+$progressRam.Size = New-Object System.Drawing.Size(915, 16)
 $progressRam.Minimum = 0
 $progressRam.Maximum = 100
 $form.Controls.Add($progressRam)
@@ -854,7 +939,7 @@ $form.Controls.Add($progressRam)
 # ---- DataGridView for entries (supports per-row action buttons + multi-select) ----
 $grid = New-Object System.Windows.Forms.DataGridView
 $grid.Location = New-Object System.Drawing.Point(15, 232)
-$grid.Size = New-Object System.Drawing.Size(855, 358)
+$grid.Size = New-Object System.Drawing.Size(915, 358)
 $grid.AllowUserToAddRows = $false
 $grid.AllowUserToDeleteRows = $false
 $grid.ReadOnly = $false
@@ -884,7 +969,7 @@ $colSession = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
 $colSession.Name = "SessionName"
 $colSession.HeaderText = "Session Name"
 $colSession.SortMode = "NotSortable"
-$colSession.Width = 215
+$colSession.Width = 220
 $colSession.ReadOnly = $true
 [void]$grid.Columns.Add($colSession)
 
@@ -928,6 +1013,7 @@ function New-ActionButtonColumn($name, $text, $width) {
 [void]$grid.Columns.Add((New-ActionButtonColumn "BtnKill"    "Kill"    53))
 [void]$grid.Columns.Add((New-ActionButtonColumn "BtnBackup"  "Backup"  63))
 [void]$grid.Columns.Add((New-ActionButtonColumn "BtnUpdate"  "Update"  63))
+[void]$grid.Columns.Add((New-ActionButtonColumn "BtnRcon"    "Rcon"    53))
 
 # ---- Bulk action buttons (apply the same action to all selected rows) ----
 $grpBulk = New-Object System.Windows.Forms.GroupBox
@@ -1027,7 +1113,7 @@ $form.Controls.Add($chkRestartEnabled)
 # ---- EditServerSettings button (standalone action, no entry context) ----
 $btnEditServerSettings = New-Object System.Windows.Forms.Button
 $btnEditServerSettings.Text = "Edit Server Settings"
-$btnEditServerSettings.Location = New-Object System.Drawing.Point(550, 710)
+$btnEditServerSettings.Location = New-Object System.Drawing.Point(610, 710)
 $btnEditServerSettings.Size = New-Object System.Drawing.Size(150, 28)
 $form.Controls.Add($btnEditServerSettings)
 
@@ -1041,7 +1127,7 @@ $btnEditServerSettings.Add_Click({ Invoke-EditServerSettings })
 # ---- CreateServerSettings button (standalone action, no entry context) ----
 $btnCreateServerSettings = New-Object System.Windows.Forms.Button
 $btnCreateServerSettings.Text = "Generate Server Settings"
-$btnCreateServerSettings.Location = New-Object System.Drawing.Point(710, 710)
+$btnCreateServerSettings.Location = New-Object System.Drawing.Point(770, 710)
 $btnCreateServerSettings.Size = New-Object System.Drawing.Size(160, 28)
 $form.Controls.Add($btnCreateServerSettings)
 
@@ -1050,7 +1136,7 @@ $btnCreateServerSettings.Add_Click({ Invoke-CreateServerSettings })
 # ---- Status label showing last refresh time ----
 $lblStatus = New-Object System.Windows.Forms.Label
 $lblStatus.Text = ""
-$lblStatus.Location = New-Object System.Drawing.Point(525, 610)
+$lblStatus.Location = New-Object System.Drawing.Point(585, 610)
 $lblStatus.Size = New-Object System.Drawing.Size(345, 20)
 $lblStatus.ForeColor = [System.Drawing.Color]::Gray
 $form.Controls.Add($lblStatus)
@@ -1058,7 +1144,7 @@ $form.Controls.Add($lblStatus)
 # ---- Managed servers RAM usage label ----
 $lblRamUsage = New-Object System.Windows.Forms.Label
 $lblRamUsage.Text = "Total RAM usage: -"
-$lblRamUsage.Location = New-Object System.Drawing.Point(525, 630)
+$lblRamUsage.Location = New-Object System.Drawing.Point(585, 630)
 $lblRamUsage.Size = New-Object System.Drawing.Size(345, 20)
 $lblRamUsage.ForeColor = [System.Drawing.Color]::Gray
 $form.Controls.Add($lblRamUsage)
@@ -1377,6 +1463,7 @@ $grid.Add_CellContentClick({
         "BtnKill"    { Invoke-EntryKill    -Key $key }
         "BtnBackup"  { Invoke-EntryBackup  -Key $key }
         "BtnUpdate"  { Invoke-EntryUpdate  -Key $key }
+        "BtnRcon"    { Invoke-EntryRcon    -Key $key }
     }
 })
 
