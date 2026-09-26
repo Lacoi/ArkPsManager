@@ -6,14 +6,20 @@ param(
     [ValidateSet("Start", "Stop", "Restart", "Kill", "Backup", "Update")]
     [string]$ActionName,
 
+    # Comma-separated list of Keys - a real string[] can't be bound reliably across a "pwsh -File" process boundary
     [Parameter(Mandatory)]
-    [string[]]$Keys,
+    [string]$Keys,
 
     [ValidateSet("Sequential", "Parallel")]
     [string]$Mode = "Sequential",
 
     [string]$ConfigJsonPath = (Get-Item $PSScriptRoot ).Parent.FullName + "\config.json"
 )
+
+# Undo the comma-join done by the caller, plus strip any stray quotes left over from ArgumentList quoting.
+# Kept as a separate variable ($KeyList, not $Keys) - $Keys is typed [string], so reassigning an array to it
+# would silently get coerced back into a single space-joined string.
+$KeyList = @($Keys -split ',' | ForEach-Object { $_.Trim('"') } | Where-Object { $_ })
 
 $scriptPath = Join-Path $PSScriptRoot "$ActionName.ps1"
 if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
@@ -28,13 +34,13 @@ if ($ActionName -eq "Start") {
     $startupDelay = [Math]::Max(0, [int]$config.GlobalSettings.Startup.Delay)
 }
 
-Write-Host "=== RunAction: $ActionName for [$($Keys -join ', ')] ($Mode) ==="
+Write-Host "=== RunAction: $ActionName for [$($KeyList -join ', ')] ($Mode) ==="
 
 $failedKeys = @()
 
 if ($Mode -eq "Sequential") {
-    for ($i = 0; $i -lt $Keys.Count; $i++) {
-        $key = $Keys[$i]
+    for ($i = 0; $i -lt $KeyList.Count; $i++) {
+        $key = $KeyList[$i]
         Write-Host "--- $ActionName : $key ---"
         try {
             & $scriptPath -Key $key -ConfigJsonPath $ConfigJsonPath
@@ -46,15 +52,15 @@ if ($Mode -eq "Sequential") {
             Write-Warning "$ActionName failed for '$key': $_"
             $failedKeys += $key
         }
-        if ($startupDelay -gt 0 -and $i -lt $Keys.Count - 1) {
+        if ($startupDelay -gt 0 -and $i -lt $KeyList.Count - 1) {
             Write-Host "Waiting $startupDelay second(s) (Startup.Delay) before starting the next server..."
             Start-Sleep -Seconds $startupDelay
         }
     }
 } else {
     $procsByKey = @{}
-    for ($i = 0; $i -lt $Keys.Count; $i++) {
-        $key = $Keys[$i]
+    for ($i = 0; $i -lt $KeyList.Count; $i++) {
+        $key = $KeyList[$i]
         $argList = @(
             "-ExecutionPolicy", "Bypass"
             "-File", "`"$scriptPath`""
@@ -63,7 +69,7 @@ if ($Mode -eq "Sequential") {
         )
         Write-Host "--- Launching $ActionName : $key ---"
         $procsByKey[$key] = Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Hidden -PassThru
-        if ($startupDelay -gt 0 -and $i -lt $Keys.Count - 1) {
+        if ($startupDelay -gt 0 -and $i -lt $KeyList.Count - 1) {
             Write-Host "Waiting $startupDelay second(s) (Startup.Delay) before launching the next server..."
             Start-Sleep -Seconds $startupDelay
         }
@@ -86,4 +92,4 @@ if ($failedKeys.Count -gt 0) {
     exit 1
 }
 
-Write-Host "=== RunAction: $ActionName complete - all $($Keys.Count) key(s) succeeded ==="
+Write-Host "=== RunAction: $ActionName complete - all $($KeyList.Count) key(s) succeeded ==="

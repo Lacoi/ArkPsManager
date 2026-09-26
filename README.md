@@ -19,6 +19,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 - **Graceful shutdown** ([actions/Stop.ps1](actions/Stop.ps1), [actions/ArkRcon](actions/ArkRcon)) - broadcasts countdown warnings over RCON, ends early once no players are connected, saves the world, then shuts the server down.
 - **Zipped backups** ([actions/Backup.ps1](actions/Backup.ps1), [actions/ServerBackup](actions/ServerBackup)) - archives server config and save-game files (`.arkprofile`, `.arktribe`, etc.) to a timestamped zip, then prunes old backups using a daily + weekly retention policy (see [Backup Retention](#backup-retention)). Fails fast if `GlobalSettings.Backup.Path` doesn't exist (e.g. an external backup drive isn't connected).
 - **Auto-restart** - optionally restarts a server automatically if it has been stopped for longer than a configurable time.
+- **Memory priority normalization** - when `GlobalSettings.Process.SetMemoryPrio` is enabled (default), any matched server process found running at a reduced memory priority is reset to Normal on every process-match refresh.
 - **Action log per server** - every action writes to `logs/<Key>/<Action>.log`, in addition to the live output shown in each action's own PowerShell window. Logs auto-rotate once they reach 1MB, keeping the 10 most recent rotated files per log.
 
 ## Requirements
@@ -76,7 +77,7 @@ logs/                      Per-server action logs (logs/<Key>/<Action>.log)
 ```jsonc
 {
   "GlobalSettings": {
-    "Process": { "Name": "ArkAscendedServer", "Path": "ShooterGame\\Binaries\\Win64", "RestartTime": 300, "RestartEnabled": true },
+    "Process": { "Name": "ArkAscendedServer", "Path": "ShooterGame\\Binaries\\Win64", "RestartTime": 300, "RestartEnabled": true, "SetMemoryPrio": true },
     "Ini":     { "Path": "ShooterGame\\Saved\\Config\\WindowsServer", "File": "GameUserSettings.ini" },
     "Startup": { "Name": "ArkAscendedServer", "File": "RunServer.cmd", "Delay": 5 },
     "Backup":  { "Path": "C:\\Backup\\ArkAsaNew", "DailyToKeep": 7, "WeeklyToKeep": 4 },
@@ -135,6 +136,8 @@ pwsh -File actions/RunAction.ps1 -ActionName Update -Keys TheIsland,TheCenter -M
 ```
 
 `-Mode` defaults to `Sequential`. For `-ActionName Start`, both modes pause `GlobalSettings.Startup.Delay` seconds between each key (between finishing one and starting the next in `Sequential`, or between launching each in `Parallel`), so multiple servers don't start at the exact same time. Exits non-zero and lists the failed keys if any key's action returns a non-zero exit code - useful for a single Task Scheduler entry that acts on every server instead of one task per key. The dashboard's bulk-action buttons use this script in `Parallel` mode.
+
+`-Keys` is a single comma-separated string (e.g. `TheIsland,TheCenter`), not a real array - `pwsh -File` can't reliably bind a true array parameter across a new-process boundary, so keys must not contain spaces or commas.
 
 ## Scheduling Actions with Task Scheduler
 

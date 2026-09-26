@@ -78,6 +78,13 @@ function Show-SettingsDialog {
     $numProcRestartTime.Value = [Math]::Max(0, [Math]::Min(86400, [int]$gs.Process.RestartTime))
     $grpProcess.Controls.Add($numProcRestartTime)
 
+    $chkProcSetMemoryPrio = New-Object System.Windows.Forms.CheckBox
+    $chkProcSetMemoryPrio.Text = "Force Normal process priority"
+    $chkProcSetMemoryPrio.Location = New-Object System.Drawing.Point(300, 84)
+    $chkProcSetMemoryPrio.Size = New-Object System.Drawing.Size(220, 20)
+    $chkProcSetMemoryPrio.Checked = if ($null -ne $gs.Process.SetMemoryPrio) { [bool]$gs.Process.SetMemoryPrio } else { $true }
+    $grpProcess.Controls.Add($chkProcSetMemoryPrio)
+
     # ---- Ini settings ----
     $grpIni = New-Object System.Windows.Forms.GroupBox
     $grpIni.Text = "Ini"
@@ -348,6 +355,7 @@ function Show-SettingsDialog {
         $latest.GlobalSettings.Process.Name = $txtProcName.Text.Trim()
         $latest.GlobalSettings.Process.Path = $txtProcPath.Text.Trim()
         $latest.GlobalSettings.Process.RestartTime = [int]$numProcRestartTime.Value
+        $latest.GlobalSettings.Process.SetMemoryPrio = $chkProcSetMemoryPrio.Checked
         $latest.GlobalSettings.Ini.Path = $txtIniPath.Text.Trim()
         $latest.GlobalSettings.Ini.File = $txtIniFile.Text.Trim()
         $latest.GlobalSettings.Startup.Name = $txtStartupName.Text.Trim()

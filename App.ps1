@@ -24,6 +24,38 @@ if (-not ("Native.MemoryStatus" -as [type])) {
 '@
 }
 
+# Native memory-priority control - .NET's ProcessPriorityClass only affects CPU scheduling,
+# so PROCESS_MEMORY_PRIORITY has to be set directly via SetProcessInformation.
+if (-not ("Native.ProcessMemoryPriority" -as [type])) {
+    Add-Type -Namespace Native -Name ProcessMemoryPriority -MemberDefinition @'
+    public const int ProcessInformationClass = 0; // ProcessMemoryPriority
+    public const uint MEMORY_PRIORITY_NORMAL = 5;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MEMORY_PRIORITY_INFORMATION
+    {
+        public uint MemoryPriority;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetProcessInformation(IntPtr hProcess, int ProcessInformationClass, ref MEMORY_PRIORITY_INFORMATION ProcessInformation, uint ProcessInformationSize);
+'@
+}
+
+# Sets a process's memory priority (default Normal); returns $false on failure (e.g. access denied)
+function Set-ProcessMemoryPriority {
+    param([Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process, [uint32]$Priority = [Native.ProcessMemoryPriority]::MEMORY_PRIORITY_NORMAL)
+    try {
+        $info = New-Object Native.ProcessMemoryPriority+MEMORY_PRIORITY_INFORMATION
+        $info.MemoryPriority = $Priority
+        $size = [System.Runtime.InteropServices.Marshal]::SizeOf([type][Native.ProcessMemoryPriority+MEMORY_PRIORITY_INFORMATION])
+        return [Native.ProcessMemoryPriority]::SetProcessInformation($Process.Handle, [Native.ProcessMemoryPriority]::ProcessInformationClass, [ref]$info, $size)
+    } catch {
+        return $false
+    }
+}
+
 # ---------------------------
 # Config handling
 # ---------------------------
@@ -37,6 +69,7 @@ function Get-DefaultConfig {
                 Path = "ShooterGame\Binaries\Win64"
                 RestartEnabled = $false
                 RestartTime = 300
+                SetMemoryPrio = $true
             }
             Ini = [PSCustomObject]@{
                 Path = "ShooterGame\Saved\Config\WindowsServer"
@@ -66,6 +99,9 @@ function Read-Config {
             }
             if (-not $json.GlobalSettings.Process) {
                 $json.GlobalSettings | Add-Member -NotePropertyName Process -NotePropertyValue $defaults.GlobalSettings.Process
+            }
+            if ($null -eq $json.GlobalSettings.Process.SetMemoryPrio) {
+                $json.GlobalSettings.Process | Add-Member -NotePropertyName SetMemoryPrio -NotePropertyValue $defaults.GlobalSettings.Process.SetMemoryPrio -Force
             }
             if (-not $json.GlobalSettings.Ini) {
                 $json.GlobalSettings | Add-Member -NotePropertyName Ini -NotePropertyValue $defaults.GlobalSettings.Ini
@@ -295,6 +331,11 @@ function Update-ProcessMatches {
             $entry.RamGB = [math]::Round($matchedProc.WorkingSet64 / 1GB, 2)
             try { $entry.StartTime = $matchedProc.StartTime } catch { }
 
+            # Some servers start with a reduced memory priority - force back to Normal
+            if ($script:config.GlobalSettings.Process.SetMemoryPrio) {
+                Set-ProcessMemoryPriority -Process $matchedProc | Out-Null
+            }
+
             try {
                 $cpuTime = $matchedProc.TotalProcessorTime
                 $prevSample = $script:cpuSamples[$matchedProc.Id]
@@ -500,8 +541,8 @@ function Invoke-BulkAction {
         "-ActionName", "$ScriptName"
         "-Mode", "$Mode"
         "-ConfigJsonPath", "`"$configPath`""
-        "-Keys"
-    ) + $Keys
+        "-Keys", "`"$($Keys -join ',')`""
+    )
 
     try {
         Start-Process -FilePath "pwsh.exe" -ArgumentList $argList -WindowStyle Normal
