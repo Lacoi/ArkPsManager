@@ -1234,6 +1234,10 @@ $btnAdd.Add_Click({
         [System.Windows.Forms.MessageBox]::Show("Key is required.", "Info") | Out-Null
         return
     }
+    if ($key -notmatch '^[a-zA-Z0-9]+$') {
+        [System.Windows.Forms.MessageBox]::Show("Key must be alphanumeric (letters and digits only).", "Info") | Out-Null
+        return
+    }
     if ($script:config.Entries | Where-Object { $_.Key -eq $key }) {
         [System.Windows.Forms.MessageBox]::Show("An entry with this Key already exists.", "Info") | Out-Null
         return
@@ -1277,6 +1281,10 @@ $btnUpdate.Add_Click({
     $key = $txtKey.Text.Trim()
     if ([string]::IsNullOrWhiteSpace($key)) {
         [System.Windows.Forms.MessageBox]::Show("Key is required.", "Info") | Out-Null
+        return
+    }
+    if ($key -notmatch '^[a-zA-Z0-9]+$') {
+        [System.Windows.Forms.MessageBox]::Show("Key must be alphanumeric (letters and digits only).", "Info") | Out-Null
         return
     }
     $serverPath = $txtServerPath.Text.Trim()
