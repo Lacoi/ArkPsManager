@@ -123,17 +123,29 @@ function Show-SettingsDialog {
     $grpStartup.Size = New-Object System.Drawing.Size(645, 100)
     $dlg.Controls.Add($grpStartup)
 
-    $lblStartupName = New-Object System.Windows.Forms.Label
-    $lblStartupName.Text = "Name:"
-    $lblStartupName.Location = New-Object System.Drawing.Point(15, 25)
-    $lblStartupName.Size = New-Object System.Drawing.Size(120, 20)
-    $grpStartup.Controls.Add($lblStartupName)
+    $lblStartupApiExe = New-Object System.Windows.Forms.Label
+    $lblStartupApiExe.Text = "ApiExe:"
+    $lblStartupApiExe.Location = New-Object System.Drawing.Point(15, 25)
+    $lblStartupApiExe.Size = New-Object System.Drawing.Size(100, 20)
+    $grpStartup.Controls.Add($lblStartupApiExe)
 
-    $txtStartupName = New-Object System.Windows.Forms.TextBox
-    $txtStartupName.Location = New-Object System.Drawing.Point(150, 22)
-    $txtStartupName.Size = New-Object System.Drawing.Size(480, 24)
-    $txtStartupName.Text = $gs.Startup.Name
-    $grpStartup.Controls.Add($txtStartupName)
+    $txtStartupApiExe = New-Object System.Windows.Forms.TextBox
+    $txtStartupApiExe.Location = New-Object System.Drawing.Point(150, 22)
+    $txtStartupApiExe.Size = New-Object System.Drawing.Size(150, 24)
+    $txtStartupApiExe.Text = $gs.Startup.ApiExe
+    $grpStartup.Controls.Add($txtStartupApiExe)
+
+    $lblStartupGameExe = New-Object System.Windows.Forms.Label
+    $lblStartupGameExe.Text = "GameExe:"
+    $lblStartupGameExe.Location = New-Object System.Drawing.Point(350, 25)
+    $lblStartupGameExe.Size = New-Object System.Drawing.Size(100, 20)
+    $grpStartup.Controls.Add($lblStartupGameExe)
+
+    $txtStartupGameExe = New-Object System.Windows.Forms.TextBox
+    $txtStartupGameExe.Location = New-Object System.Drawing.Point(480, 22)
+    $txtStartupGameExe.Size = New-Object System.Drawing.Size(150, 24)
+    $txtStartupGameExe.Text = $gs.Startup.GameExe
+    $grpStartup.Controls.Add($txtStartupGameExe)
 
     $lblStartupFile = New-Object System.Windows.Forms.Label
     $lblStartupFile.Text = "File:"
@@ -201,7 +213,7 @@ function Show-SettingsDialog {
     $grpBackup.Controls.Add($lblBackupWeeklyToKeep)
 
     $numBackupWeeklyToKeep = New-Object System.Windows.Forms.NumericUpDown
-    $numBackupWeeklyToKeep.Location = New-Object System.Drawing.Point(410, 52)
+    $numBackupWeeklyToKeep.Location = New-Object System.Drawing.Point(405, 52)
     $numBackupWeeklyToKeep.Size = New-Object System.Drawing.Size(110, 24)
     $numBackupWeeklyToKeep.Minimum = 0
     $numBackupWeeklyToKeep.Maximum = 520
@@ -222,8 +234,8 @@ function Show-SettingsDialog {
     $grpShutdown.Controls.Add($lblShutdownTime)
 
     $numShutdownTime = New-Object System.Windows.Forms.NumericUpDown
-    $numShutdownTime.Location = New-Object System.Drawing.Point(120, 22)
-    $numShutdownTime.Size = New-Object System.Drawing.Size(120, 24)
+    $numShutdownTime.Location = New-Object System.Drawing.Point(150, 22)
+    $numShutdownTime.Size = New-Object System.Drawing.Size(110, 24)
     $numShutdownTime.Minimum = 0
     $numShutdownTime.Maximum = 999999
     $numShutdownTime.Value = [Math]::Max(0, [Math]::Min(999999, [int]$gs.Shutdown.Time))
@@ -231,13 +243,13 @@ function Show-SettingsDialog {
 
     $lblShutdownExitDelay = New-Object System.Windows.Forms.Label
     $lblShutdownExitDelay.Text = "ExitDelay (s):"
-    $lblShutdownExitDelay.Location = New-Object System.Drawing.Point(260, 25)
+    $lblShutdownExitDelay.Location = New-Object System.Drawing.Point(280, 25)
     $lblShutdownExitDelay.Size = New-Object System.Drawing.Size(110, 20)
     $grpShutdown.Controls.Add($lblShutdownExitDelay)
 
     $numShutdownExitDelay = New-Object System.Windows.Forms.NumericUpDown
-    $numShutdownExitDelay.Location = New-Object System.Drawing.Point(375, 22)
-    $numShutdownExitDelay.Size = New-Object System.Drawing.Size(120, 24)
+    $numShutdownExitDelay.Location = New-Object System.Drawing.Point(405, 22)
+    $numShutdownExitDelay.Size = New-Object System.Drawing.Size(110, 24)
     $numShutdownExitDelay.Minimum = 0
     $numShutdownExitDelay.Maximum = 999999
     $numShutdownExitDelay.Value = [Math]::Max(0, [Math]::Min(999999, [int]$gs.Shutdown.ExitDelay))
@@ -358,7 +370,8 @@ function Show-SettingsDialog {
         $latest.GlobalSettings.Process.SetMemoryPrio = $chkProcSetMemoryPrio.Checked
         $latest.GlobalSettings.Ini.Path = $txtIniPath.Text.Trim()
         $latest.GlobalSettings.Ini.File = $txtIniFile.Text.Trim()
-        $latest.GlobalSettings.Startup.Name = $txtStartupName.Text.Trim()
+        $latest.GlobalSettings.Startup.ApiExe = $txtStartupApiExe.Text.Trim()
+        $latest.GlobalSettings.Startup.GameExe = $txtStartupGameExe.Text.Trim()
         $latest.GlobalSettings.Startup.File = $txtStartupFile.Text.Trim()
         $latest.GlobalSettings.Startup.Delay = [int]$numStartupDelay.Value
         $latest.GlobalSettings.Backup.Path = $txtBackupPath.Text.Trim()

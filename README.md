@@ -13,6 +13,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
   - Downloads the latest [AsaApi](https://github.com/ArkServerApi/AsaApi) release from GitHub, but only when the tagged version differs from the cached one (checked via a local `version.txt`).
 - **Diff-based plugin sync** ([actions/Update.ps1](actions/Update.ps1)) - `ArkApi\Plugins` is synced from `Cache\AsaApiPlugins` and, if present, a map-specific `config/maps/<Key>/plugins` overlay (which wins on name conflicts), copying only new/changed files and deleting orphans in a single combined diff - no full wipe-and-recopy on every update.
 - **Build pinning** - drop a `<buildid>.build` marker file in `Cache\` to pin server updates to a specific cached build snapshot instead of the latest one. Set **Use Latest Build** on an individual entry (in the GUI, or `UseLatestBuild` in `config.json`) to make that one server ignore the pin and always update from the latest cache.
+- **Per-entry API/Game exe switch** - each entry has a **Use AsaApi Exe** checkbox (`UseApiExe` in `config.json`, defaults to `true`) controlling which executable name **Generate Server Settings** writes into that entry's `RunServer.cmd`: `GlobalSettings.Startup.ApiExe` (e.g. `AsaApiLoader`) when checked, or `GlobalSettings.Startup.GameExe` (e.g. `ArkAscendedServer`) when unchecked - useful for running a server without the AsaApi plugin loader.
 - **Per-map INI merging** ([actions/CreateServerSettings.ps1](CreateServerSettings.ps1), [actions/IniMerge](actions/IniMerge)) - maintain one shared `Base_Game.ini` / `Base_GameUserSettings.ini`, then layer per-map `*_Append.ini` / `*_Override.ini` overrides from `config/ini/<Key>/` to produce each server's final `config/maps/<Key>/config/*.ini`.
 - **Generated launch scripts** - per-map `run.json` (start options, URL options, command-line options, mods) is merged with a shared base `run.json` to generate each server's `RunServer.cmd`.
 - **Server Settings editor** ([settings/server.ps1](settings/server.ps1)) - a WinForms GUI (opened in-process via **Edit Server Settings**) for editing the raw `config/ini` source files directly: the shared `(Global)` `Base_Game.ini` / `Base_GameUserSettings.ini` / `run.json`, or any per-map `Game_Append.ini` / `Game_Override.ini` / `GameUserSettings_Append.ini` / `GameUserSettings_Override.ini` / `run.json` under `config/ini/<Key>/`. Saving skips/deletes files left empty instead of writing blank files, so untouched overrides aren't created.
@@ -81,12 +82,12 @@ logs/                      Per-server action logs (logs/<Key>/<Action>.log)
   "GlobalSettings": {
     "Process": { "Name": "ArkAscendedServer", "Path": "ShooterGame\\Binaries\\Win64", "RestartTime": 300, "RestartEnabled": true, "SetMemoryPrio": true },
     "Ini":     { "Path": "ShooterGame\\Saved\\Config\\WindowsServer", "File": "GameUserSettings.ini" },
-    "Startup": { "Name": "ArkAscendedServer", "File": "RunServer.cmd", "Delay": 5 },
+    "Startup": { "ApiExe": "AsaApiLoader", "GameExe": "ArkAscendedServer", "File": "RunServer.cmd", "Delay": 5 },
     "Backup":  { "Path": "C:\\Backup\\ArkAsaNew", "DailyToKeep": 7, "WeeklyToKeep": 4 },
     "Shutdown": { "Time": 900, "ExitDelay": 5, "Messages": { "900": "...", "0": "..." } }
   },
   "Entries": [
-    { "Key": "TheIsland", "ServerPath": "C:\\ArkServer\\Server1", "UseLatestBuild": false }
+    { "Key": "TheIsland", "ServerPath": "C:\\ArkServer\\Server1", "UseLatestBuild": false, "UseApiExe": true }
   ]
 }
 ```

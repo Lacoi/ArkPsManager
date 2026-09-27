@@ -103,9 +103,9 @@ foreach ($entry in $config.Entries) {
         -not [string]::IsNullOrWhiteSpace([string]$_)
     } | Select-Object -Unique
 
-    $startupExe = $config.GlobalSettings.Startup.Name -replace '\.exe$', ''
+    $startupExe = if ($null -eq $entry.UseApiExe -or $entry.UseApiExe) { $config.GlobalSettings.Startup.ApiExe } else { $config.GlobalSettings.Startup.GameExe }
+    $startupExe = $startupExe -replace '\.exe$', ''
     $serverExecutable = Join-Path $entry.ServerPath (Join-Path $config.GlobalSettings.Process.Path "$($startupExe).exe")
-    #$serverExecutable = [System.IO.Path]::Combine($entry.ServerPath, $config.GlobalSettings.Process.Path, "$($config.GlobalSettings.Startup.Name).exe")
     $serverUrl = $entryRunConfig.map + '?' + ($urlOptions -join '?')
     $arguments = @($commandLineOptions)
     if ($mods.Count -gt 0) {
@@ -113,7 +113,6 @@ foreach ($entry in $config.Entries) {
     }
     $command = "start `"#$($entry.Key)`" $($startOptions -join ' ') `"$serverExecutable`" $serverUrl $($arguments -join ' ')".Trim() -replace ' {2,}', ' '
     $runServerPath = Join-Path $actionsRoot (Join-Path 'config\maps' (Join-Path $entry.Key (Join-Path 'config' $startupFile)))
-    #$runServerPath = [System.IO.Path]::Combine($actionsRoot, 'config', 'maps', $entry.Key, 'config', $config.GlobalSettings.Startup.File)
 
     $runFileCount++
     if ($PSCmdlet.ShouldProcess($runServerPath, "$($entry.Key): Write RunServer.cmd")) {

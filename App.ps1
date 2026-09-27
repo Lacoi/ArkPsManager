@@ -76,8 +76,10 @@ function Get-DefaultConfig {
                 File = "GameUserSettings.ini"
             }
             Startup = [PSCustomObject]@{
-                File  = "RunServer.cmd"
-                Delay = 5
+                ApiExe  = "AsaApiLoader"
+                GameExe = "ArkAscendedServer"
+                File    = "RunServer.cmd"
+                Delay   = 5
             }
             Backup = [PSCustomObject]@{
                 Path = "E:\Backup\ArkAsaNew"
@@ -109,6 +111,12 @@ function Read-Config {
             if (-not $json.GlobalSettings.Startup) {
                 $json.GlobalSettings | Add-Member -NotePropertyName Startup -NotePropertyValue $defaults.GlobalSettings.Startup
             }
+            if ($null -eq $json.GlobalSettings.Startup.ApiExe) {
+                $json.GlobalSettings.Startup | Add-Member -NotePropertyName ApiExe -NotePropertyValue $defaults.GlobalSettings.Startup.ApiExe -Force
+            }
+            if ($null -eq $json.GlobalSettings.Startup.GameExe) {
+                $json.GlobalSettings.Startup | Add-Member -NotePropertyName GameExe -NotePropertyValue $defaults.GlobalSettings.Startup.GameExe -Force
+            }
             if (-not $json.GlobalSettings.Backup) {
                 $json.GlobalSettings | Add-Member -NotePropertyName Backup -NotePropertyValue $defaults.GlobalSettings.Backup
             }
@@ -120,6 +128,7 @@ function Read-Config {
                         ServerPath       = $e.ServerPath
                         ConfigPath       = Join-Path $PSScriptRoot (Join-Path "config/maps" $e.Key)
                         UseLatestBuild   = [bool]$e.UseLatestBuild
+                        UseApiExe        = if ($null -eq $e.UseApiExe) { $true } else { [bool]$e.UseApiExe }
                         Pid              = $null   # runtime only, not persisted
                         RamGB            = $null   # runtime only, not persisted
                         CpuPercent       = $null   # runtime only, not persisted
@@ -153,6 +162,7 @@ function Save-Config {
             Key            = $_.Key
             ServerPath     = $_.ServerPath
             UseLatestBuild = $_.UseLatestBuild
+            UseApiExe      = $_.UseApiExe
         }
     }
 
@@ -887,15 +897,22 @@ $grpEntry.Controls.Add($lblConfigPath)
 
 $txtConfigPath = New-Object System.Windows.Forms.TextBox
 $txtConfigPath.Location = New-Object System.Drawing.Point(110, 52)
-$txtConfigPath.Size = New-Object System.Drawing.Size(550, 24)
+$txtConfigPath.Size = New-Object System.Drawing.Size(500, 24)
 $txtConfigPath.ReadOnly = $true
 $grpEntry.Controls.Add($txtConfigPath)
 
 $chkUseLatestBuild = New-Object System.Windows.Forms.CheckBox
 $chkUseLatestBuild.Text = "Use Latest Build"
-$chkUseLatestBuild.Location = New-Object System.Drawing.Point(670, 55)
-$chkUseLatestBuild.Size = New-Object System.Drawing.Size(160, 20)
+$chkUseLatestBuild.Location = New-Object System.Drawing.Point(620, 55)
+$chkUseLatestBuild.Size = New-Object System.Drawing.Size(120, 20)
 $grpEntry.Controls.Add($chkUseLatestBuild)
+
+$chkUseApiExe = New-Object System.Windows.Forms.CheckBox
+$chkUseApiExe.Text = "Use AsaApi"
+$chkUseApiExe.Location = New-Object System.Drawing.Point(750, 55)
+$chkUseApiExe.Size = New-Object System.Drawing.Size(150, 20)
+$chkUseApiExe.Checked = $true
+$grpEntry.Controls.Add($chkUseApiExe)
 
 # ---- Buttons for entry actions ----
 $btnAdd = New-Object System.Windows.Forms.Button
@@ -1208,12 +1225,14 @@ function Update-Grid {
             $txtServerPath.Text = $entry.ServerPath
             $txtConfigPath.Text = $entry.ConfigPath
             $chkUseLatestBuild.Checked = [bool]$entry.UseLatestBuild
+            $chkUseApiExe.Checked = [bool]$entry.UseApiExe
         }
     } else {
         $txtKey.Clear()
         $txtServerPath.Clear()
         $txtConfigPath.Clear()
         $chkUseLatestBuild.Checked = $false
+        $chkUseApiExe.Checked = $true
     }
 
     $runningEntries = @($script:config.Entries | Where-Object { $null -ne $_.RamGB })
@@ -1277,6 +1296,7 @@ function Clear-EntryFields {
     $txtServerPath.Clear()
     $txtConfigPath.Clear()
     $chkUseLatestBuild.Checked = $false
+    $chkUseApiExe.Checked = $true
     $grid.ClearSelection()
 }
 
@@ -1338,6 +1358,7 @@ $btnAdd.Add_Click({
         ServerPath       = $serverPath
         ConfigPath       = Join-Path $PSScriptRoot (Join-Path "config/maps" $key)
         UseLatestBuild   = $chkUseLatestBuild.Checked
+        UseApiExe        = $chkUseApiExe.Checked
         Pid              = $null
         RamGB            = $null
         CpuPercent       = $null
@@ -1386,6 +1407,7 @@ $btnUpdate.Add_Click({
     $script:config.Entries[$idx].ServerPath = $serverPath
     $script:config.Entries[$idx].ConfigPath = Join-Path $PSScriptRoot (Join-Path "config/maps" $key)
     $script:config.Entries[$idx].UseLatestBuild = $chkUseLatestBuild.Checked
+    $script:config.Entries[$idx].UseApiExe = $chkUseApiExe.Checked
     Update-ProcessMatches
     Reset-GridRows
     Clear-EntryFields
@@ -1438,12 +1460,14 @@ $grid.Add_SelectionChanged({
             $txtServerPath.Text = $entry.ServerPath
             $txtConfigPath.Text = $entry.ConfigPath
             $chkUseLatestBuild.Checked = [bool]$entry.UseLatestBuild
+            $chkUseApiExe.Checked = [bool]$entry.UseApiExe
         }
     } else {
         $txtKey.Clear()
         $txtServerPath.Clear()
         $txtConfigPath.Clear()
         $chkUseLatestBuild.Checked = $false
+        $chkUseApiExe.Checked = $true
     }
 })
 

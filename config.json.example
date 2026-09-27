@@ -4,14 +4,16 @@
                                            "Name":  "ArkAscendedServer",
                                            "Path":  "ShooterGame\\Binaries\\Win64",
                                            "RestartTime":  300,
-                                           "RestartEnabled":  true
+                                           "RestartEnabled":  true,
+                                           "SetMemoryPrio":  true
                                        },
                            "Ini":  {
                                        "Path":  "ShooterGame\\Saved\\Config\\WindowsServer",
                                        "File":  "GameUserSettings.ini"
                                    },
                            "Startup":  {
-                                           "Name":  "ArkAscendedServer",
+                                           "ApiExe":  "AsaApiLoader",
+                                           "GameExe":  "ArkAscendedServer",
                                            "File":  "RunServer.cmd",
                                            "Delay":  5
                                        },
