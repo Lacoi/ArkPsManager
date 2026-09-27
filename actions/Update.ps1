@@ -133,6 +133,8 @@ try {
                 $resolvedTarget = (Resolve-Path -LiteralPath $pluginPath).ProviderPath.TrimEnd('\', '/')
                 Get-ChildItem -LiteralPath $resolvedTarget -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
                     $relativePath = $_.FullName.Substring($resolvedTarget.Length).TrimStart('\', '/')
+                    # .db* files (SQLite plugin databases, e.g. .db/.db-journal/.db-shm/.db-wal) are plugin data, never orphan cleanup targets
+                    if ($_.Extension -like '.db*') { return }
                     if (-not $expectedRelativePaths.Contains($relativePath)) {
                         Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Removing orphaned plugin file: $relativePath"
                         Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue

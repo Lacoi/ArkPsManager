@@ -18,7 +18,7 @@ if (-not $actionLock) {
 try {
     if (-not $ctx.Pid) {
         Write-ActionMessage -Ctx $ctx -ActionName "Stop" -Message "No running process found for '$($ctx.Key)'. Nothing to stop."
-        Exit 1
+        Exit 0
         return
     }
 
