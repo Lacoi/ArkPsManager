@@ -61,6 +61,9 @@ function Set-ProcessMemoryPriority {
 # ---------------------------
 $configPath = Join-Path $PSScriptRoot "config.json"
 
+# External scripts running multiple actions can create this file to make the dashboard skip auto-restart until it's removed
+$script:autoRestartPauseFile = Join-Path $PSScriptRoot "AutoRestartPaused.flag"
+
 function Get-DefaultConfig {
     [PSCustomObject]@{
         GlobalSettings = [PSCustomObject]@{
@@ -1249,10 +1252,18 @@ function Update-Grid {
     $restartEnabled = [bool]$script:config.GlobalSettings.Process.RestartEnabled
     $restartTimeSeconds = [int]($script:config.GlobalSettings.Process.RestartTime)
     $startupFile = $script:config.GlobalSettings.Startup.File
+    $autoRestartPaused = Test-Path -LiteralPath $script:autoRestartPauseFile -PathType Leaf
     foreach ($entry in $script:config.Entries) {
         if ([string]::IsNullOrWhiteSpace($entry.ServerPath)) { continue }
 
         if ($entry.Pid -or $null -eq $entry.SessionName -or -not $entry.RestartEnabled) {
+            $entry.StoppedSince = $null
+            $entry.RestartTriggered = $false
+            continue
+        }
+
+        # An external script is running multiple actions - skip and reset the clock so it starts fresh once unpaused
+        if ($autoRestartPaused) {
             $entry.StoppedSince = $null
             $entry.RestartTriggered = $false
             continue
