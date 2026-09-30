@@ -1211,6 +1211,8 @@ function Update-Grid {
         $startText = if ($entry.StartTime) { $entry.StartTime.ToString("dd.MM. HH:mm:ss") } else { if ($entry.StoppedSince) { "off: " + $entry.StoppedSince.ToString("dd.MM.yyyy HH:mm:ss") } else { "-" } }
 
         if ($row.Cells["Pid"].Value -ne $pidText) { $row.Cells["Pid"].Value = $pidText }
+        $pidCellColor = if ($entry.Pid) { [System.Drawing.Color]::LightGreen } else { [System.Drawing.Color]::LightCoral }
+        if ($row.Cells["Pid"].Style.BackColor -ne $pidCellColor) { $row.Cells["Pid"].Style.BackColor = $pidCellColor }
         if ($row.Cells["SessionName"].Value -ne $sessionText) { $row.Cells["SessionName"].Value = $sessionText }
         if ($row.Cells["RamGB"].Value -ne $ramText) { $row.Cells["RamGB"].Value = $ramText }
         if ($row.Cells["CpuPercent"].Value -ne $cpuText) { $row.Cells["CpuPercent"].Value = $cpuText }
