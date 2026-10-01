@@ -16,6 +16,9 @@
     Create it before starting a batch of actions, and make sure it's removed afterwards
     (even on failure) with try/finally.
 
+    Stop/Update/Start are each run for all Keys via actions/RunAction.ps1 (Sequential
+    mode), the same proxy script the dashboard's bulk-action buttons use.
+
 .EXAMPLE
     pwsh -File examples/BulkMaintenance.ps1 -Keys TheIsland,Ragnarok
 #>
@@ -35,18 +38,17 @@ New-Item -Path $pauseFlagPath -ItemType File -Force | Out-Null
 Write-Host "Auto-restart paused (created '$pauseFlagPath')."
 
 try {
-    foreach ($key in $Keys) {
-        Write-Host "=== Maintenance for '$key' ==="
+    $keysArg = $Keys -join ','
+    $runActionPath = Join-Path $actionsFolder "RunAction.ps1"
 
-        Write-Host "Stopping '$key'..."
-        & (Join-Path $actionsFolder "Stop.ps1") -Key $key -ConfigJsonPath $ConfigJsonPath
+    Write-Host "Stopping [$keysArg]..."
+    & $runActionPath -ActionName Stop -Keys $keysArg -Mode Parallel -ConfigJsonPath $ConfigJsonPath
 
-        Write-Host "Updating '$key'..."
-        & (Join-Path $actionsFolder "Update.ps1") -Key $key -ConfigJsonPath $ConfigJsonPath -FastExit
+    Write-Host "Updating [$keysArg]..."
+    & $runActionPath -ActionName Update -Keys $keysArg -Mode Sequential -ConfigJsonPath $ConfigJsonPath
 
-        Write-Host "Starting '$key'..."
-        & (Join-Path $actionsFolder "Start.ps1") -Key $key -ConfigJsonPath $ConfigJsonPath
-    }
+    Write-Host "Starting [$keysArg]..."
+    & $runActionPath -ActionName Start -Keys $keysArg -Mode Sequential -ConfigJsonPath $ConfigJsonPath
 } finally {
     # Always remove the flag, even if a step above throws, so the dashboard resumes normal auto-restart
     Remove-Item -Path $pauseFlagPath -Force -ErrorAction SilentlyContinue
