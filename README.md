@@ -11,7 +11,7 @@ A Windows PowerShell + WinForms GUI for running and maintaining multiple **ARK: 
 - **Shared local cache** ([actions/UpdateCache.ps1](actions/UpdateCache.ps1)) - installs SteamCMD on first run and keeps a single cached copy of the ARK server files (app `2430930`), so every server instance updates from disk instead of re-downloading from Steam.
   - Detects the SteamCMD build id from `appmanifest_2430930.acf` and snapshots the cache into a versioned `Cache\Server_<buildid>` folder, automatically pruning old snapshots down to the latest 3 - any build with a matching `<buildid>.build` marker is never pruned, no matter how old.
   - Downloads the latest [AsaApi](https://github.com/ArkServerApi/AsaApi) release from GitHub, but only when the tagged version differs from the cached one (checked via a local `version.txt`).
-- **Diff-based plugin sync** ([actions/Update.ps1](actions/Update.ps1)) - `ArkApi\Plugins` is synced from `Cache\AsaApiPlugins` and, if present, a map-specific `config/maps/<Key>/plugins` overlay (which wins on name conflicts), copying only new/changed files and deleting orphans in a single combined diff - no full wipe-and-recopy on every update.
+- **Diff-based plugin sync** ([actions/Update.ps1](actions/Update.ps1)) - `ArkApi\Plugins` is synced from `config/api/plugins` and, if present, a map-specific `config/maps/<Key>/plugins` overlay (which wins on name conflicts), copying only new/changed files and deleting orphans in a single combined diff - no full wipe-and-recopy on every update.
 - **Build pinning** - drop a `<buildid>.build` marker file in `Cache\` to pin server updates to a specific cached build snapshot instead of the latest one. Set **Use Latest Build** on an individual entry (in the GUI, or `UseLatestBuild` in `config.json`) to make that one server ignore the pin and always update from the latest cache.
 - **Per-entry API/Game exe switch** - each entry has a **Use AsaApi Exe** checkbox (`UseApiExe` in `config.json`, defaults to `true`) controlling which executable name **Generate Server Settings** writes into that entry's `RunServer.cmd`: `GlobalSettings.Startup.ApiExe` (e.g. `AsaApiLoader`) when checked, or `GlobalSettings.Startup.GameExe` (e.g. `ArkAscendedServer`) when unchecked - useful for running a server without the AsaApi plugin loader.
 - **Per-map INI merging** ([actions/CreateServerSettings.ps1](CreateServerSettings.ps1), [actions/IniMerge](actions/IniMerge)) - maintain one shared `Base_Game.ini` / `Base_GameUserSettings.ini`, then layer per-map `*_Append.ini` / `*_Override.ini` overrides from `config/ini/<Key>/` to produce each server's final `config/maps/<Key>/config/*.ini`.
@@ -69,7 +69,7 @@ actions/
 config/
   ini/                     Base_Game.ini, Base_GameUserSettings.ini, base run.json, per-map overrides
   maps/                    Generated per-map config output (config/maps/<Key>/config, RunServer.cmd)
-  api/                     Default ark api config.json
+  api/                     Default ark api config.json, plugins/ (default plugin cache synced to every server)
 
 cache/                     Shared SteamCMD + server file cache (created automatically)
 logs/                      Per-server action logs (logs/<Key>/<Action>.log)

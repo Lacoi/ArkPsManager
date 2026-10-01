@@ -92,27 +92,27 @@ try {
     # PluginPath that's no longer in either source - one combined diff instead of two independent
     # mirrors, which would delete and re-copy each other's files on every run.
     $pluginPath = Join-Path $ctx.ServerPath (Join-Path $ctx.ProcessPath "ArkApi\Plugins")
-    $defaultPluginCache = Join-Path $actionsRoot "Cache\AsaApiPlugins"
-    $mapPluginCache = Join-Path $actionsRoot (Join-Path "config\maps" (Join-Path $ctx.Key "plugins"))
-    $defaultPluginCacheExists = Test-Path -LiteralPath $defaultPluginCache -PathType Container
-    $mapPluginCacheExists = Test-Path -LiteralPath $mapPluginCache -PathType Container
+    $defaultPluginFolder = Join-Path $actionsRoot "config\api\plugins"
+    $mapPluginFolder = Join-Path $actionsRoot (Join-Path "config\maps" (Join-Path $ctx.Key "plugins"))
+    $defaultPluginFolderExists = Test-Path -LiteralPath $defaultPluginFolder -PathType Container
+    $mapPluginFolderExists = Test-Path -LiteralPath $mapPluginFolder -PathType Container
 
     try {
-        if (-not $defaultPluginCacheExists -and -not $mapPluginCacheExists) {
+        if (-not $defaultPluginFolderExists -and -not $mapPluginFolderExists) {
             Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Plugin caches not found. Skipping update. Please run the 'UpdateCache' action first."
         } else {
-            if ($defaultPluginCacheExists) {
+            if ($defaultPluginFolderExists) {
                 Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Updating plugins..."
-                Sync-Folder -Source $defaultPluginCache -Target $pluginPath -Verbose -LogAction {
+                Sync-Folder -Source $defaultPluginFolder -Target $pluginPath -Verbose -LogAction {
                     param([string]$Message)
                     Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message $Message
                 }
             }
 
             # map-specific plugins layer on top of, and take precedence over, the default cache
-            if ($mapPluginCacheExists) {
-                Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Updating PluginConfig..."
-                Sync-Folder -Source $mapPluginCache -Target $pluginPath -Verbose -LogAction {
+            if ($mapPluginFolderExists) {
+                Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message "Updating map-specific plugins..."
+                Sync-Folder -Source $mapPluginFolder -Target $pluginPath -Verbose -LogAction {
                     param([string]$Message)
                     Write-ActionMessage -Ctx $ctx -ActionName "Update" -Message $Message
                 }
@@ -120,7 +120,7 @@ try {
 
             # build the combined set of relative paths that should exist, from both sources
             $expectedRelativePaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-            foreach ($cachePath in @($defaultPluginCache, $mapPluginCache)) {
+            foreach ($cachePath in @($defaultPluginFolder, $mapPluginFolder)) {
                 if (-not (Test-Path -LiteralPath $cachePath -PathType Container)) { continue }
                 $resolvedCache = (Resolve-Path -LiteralPath $cachePath).ProviderPath.TrimEnd('\', '/')
                 Get-ChildItem -LiteralPath $resolvedCache -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {

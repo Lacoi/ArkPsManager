@@ -1484,6 +1484,13 @@ $grid.Add_SelectionChanged({
     }
 })
 
+# ---- Clicking the empty area below the last row (outside any entry) clears the selection ----
+$grid.Add_MouseDown({
+    param($eventSender, $e)
+    $hit = $grid.HitTest($e.X, $e.Y)
+    if ($hit.RowIndex -lt 0) { $grid.ClearSelection() }
+})
+
 # ---- Handle per-row action button clicks ----
 $grid.Add_CellContentClick({
     param($eventSender, $e)
