@@ -258,7 +258,7 @@ function Sync-Folder {
         Errors    = $result.Errors
     }
 
-    Invoke-SyncLog -LogAction $LogAction -Message "Sync complete: $($summary.Copied) copied, $($summary.Updated) updated, $($summary.Unchanged) unchanged, $($summary.Errors) errors."
+    Invoke-SyncLog -LogAction $LogAction -Message "Sync complete: $($summary.Copied) copied, $($summary.Updated) updated, $($summary.Deleted) deleted, $($summary.Unchanged) unchanged, $($summary.Errors) errors."
 
     return $summary
 }
