@@ -602,6 +602,51 @@ function Invoke-EntryRcon {
 }
 
 # ---------------------------
+# Non-blocking confirmation prompt (.Show, not MessageBox.Show) - runs $OnConfirm if the user clicks Yes
+# ---------------------------
+function Show-ConfirmDialog {
+    param([string]$Message, [string]$Title, [scriptblock]$OnConfirm)
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = $Title
+    $dlg.Size = New-Object System.Drawing.Size(420, 150)
+    $dlg.StartPosition = "CenterScreen"
+    $dlg.FormBorderStyle = "FixedDialog"
+    $dlg.MaximizeBox = $false
+    $dlg.MinimizeBox = $false
+    $dlg.TopMost = $true
+
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = $Message
+    $lbl.Location = New-Object System.Drawing.Point(15, 15)
+    $lbl.Size = New-Object System.Drawing.Size(380, 50)
+    $dlg.Controls.Add($lbl)
+
+    $btnYes = New-Object System.Windows.Forms.Button
+    $btnYes.Text = "Yes"
+    $btnYes.Location = New-Object System.Drawing.Point(235, 75)
+    $btnYes.Size = New-Object System.Drawing.Size(80, 28)
+    $dlg.Controls.Add($btnYes)
+
+    $btnNo = New-Object System.Windows.Forms.Button
+    $btnNo.Text = "No"
+    $btnNo.Location = New-Object System.Drawing.Point(315, 75)
+    $btnNo.Size = New-Object System.Drawing.Size(80, 28)
+    $dlg.Controls.Add($btnNo)
+
+    $dlg.AcceptButton = $btnNo
+    $dlg.CancelButton = $btnNo
+
+    $btnYes.Add_Click({
+        $dlg.Close()
+        & $OnConfirm
+    }.GetNewClosure())
+    $btnNo.Add_Click({ $dlg.Close() }.GetNewClosure())
+
+    $dlg.Show()
+}
+
+# ---------------------------
 # Bulk action functions (apply the same action to ALL currently selected rows, via RunAction.ps1)
 # ---------------------------
 function Invoke-BulkAction {
@@ -1313,6 +1358,25 @@ function Clear-EntryFields {
     $grid.ClearSelection()
 }
 
+# Not a closure - $script:config resolves correctly here since this is a normal function, unlike a .GetNewClosure() scriptblock
+function Remove-SelectedEntries {
+    param([string[]]$Keys)
+
+    foreach ($k in $Keys) {
+        $idx = -1
+        for ($i = 0; $i -lt $script:config.Entries.Count; $i++) {
+            if ($script:config.Entries[$i].Key -eq $k) { $idx = $i; break }
+        }
+        if ($idx -ne -1) {
+            $script:config.Entries.RemoveAt($idx)
+        }
+    }
+
+    Reset-GridRows
+    Clear-EntryFields
+    Save-Config
+}
+
 Update-ProcessMatches
 Update-AutorestartFlags
 Update-SessionNames
@@ -1435,19 +1499,9 @@ $btnRemove.Add_Click({
 
     $keysToRemove = @($grid.SelectedRows | ForEach-Object { $_.Cells["KeyCol"].Value })
 
-    foreach ($k in $keysToRemove) {
-        $idx = -1
-        for ($i = 0; $i -lt $script:config.Entries.Count; $i++) {
-            if ($script:config.Entries[$i].Key -eq $k) { $idx = $i; break }
-        }
-        if ($idx -ne -1) {
-            $script:config.Entries.RemoveAt($idx)
-        }
-    }
-
-    Reset-GridRows
-    Clear-EntryFields
-    Save-Config
+    Show-ConfirmDialog -Message "Are you sure you want to remove $($keysToRemove.Count) selected entry/entries?" -Title "Confirm Remove" -OnConfirm {
+        Remove-SelectedEntries -Keys $keysToRemove
+    }.GetNewClosure()
 })
 
 $btnClear.Add_Click({ Clear-EntryFields })

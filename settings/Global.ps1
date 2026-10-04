@@ -79,7 +79,7 @@ function Show-SettingsDialog {
     $grpProcess.Controls.Add($numProcRestartTime)
 
     $chkProcSetMemoryPrio = New-Object System.Windows.Forms.CheckBox
-    $chkProcSetMemoryPrio.Text = "Force Normal process priority"
+    $chkProcSetMemoryPrio.Text = "Force Normal memory priority"
     $chkProcSetMemoryPrio.Location = New-Object System.Drawing.Point(300, 84)
     $chkProcSetMemoryPrio.Size = New-Object System.Drawing.Size(220, 20)
     $chkProcSetMemoryPrio.Checked = if ($null -ne $gs.Process.SetMemoryPrio) { [bool]$gs.Process.SetMemoryPrio } else { $true }
